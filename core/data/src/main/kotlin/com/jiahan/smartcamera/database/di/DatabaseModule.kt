@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import com.jiahan.smartcamera.database.AppDatabase
 import com.jiahan.smartcamera.database.dao.NoteDao
-import com.jiahan.smartcamera.database.dao.PhotoDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,12 +21,6 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
         return Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME).build()
-    }
-
-    @Provides
-    @Singleton
-    fun providePhotoDao(appDatabase: AppDatabase): PhotoDao {
-        return appDatabase.photoDao()
     }
 
     @Provides
