@@ -6,9 +6,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jiahan.smartcamera.MainDispatcherRule
 import com.jiahan.smartcamera.data.repository.AnalyticsRepository
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
 import com.jiahan.smartcamera.domain.MediaDetail
-import com.jiahan.smartcamera.util.AppConstants.MAX_POST_TEXT_LENGTH
+import com.jiahan.smartcamera.domain.Note
+import com.jiahan.smartcamera.util.AppConstants.MAX_NOTE_TEXT_LENGTH
 import com.jiahan.smartcamera.util.ErrorHandler
 import com.jiahan.smartcamera.util.ResourceProvider
 import io.mockk.coEvery
@@ -56,12 +56,12 @@ class EditNoteViewModelTest {
 
     private val noteId = "note1"
 
-    private val testNote = HomeNote(
+    private val testNote = Note(
         noteId = noteId,
         text = "Original text",
         mediaList = listOf(MediaDetail(photoUrl = "http://photo")),
         username = "user1",
-        favorite = true
+        isFavorite = true
     )
 
     private fun createViewModel() = EditNoteViewModel(
@@ -77,7 +77,7 @@ class EditNoteViewModelTest {
         every { errorHandler.logError(any()) } just runs
         every { errorHandler.getErrorMessage(any()) } returns "Error"
         every { resourceProvider.getString(any()) } returns "Text too long"
-        every { analyticsRepository.logEditNoteCustomEvent(any()) } just runs
+        every { analyticsRepository.logNoteEdit(any()) } just runs
         coEvery { noteRepository.getNote(noteId) } returns Result.success(testNote)
     }
 
@@ -120,7 +120,7 @@ class EditNoteViewModelTest {
     fun `updateNoteText sets an error above the max length`() = runTest {
         val vm = createViewModel()
 
-        vm.updateNoteText("a".repeat(MAX_POST_TEXT_LENGTH + 1))
+        vm.updateNoteText("a".repeat(MAX_NOTE_TEXT_LENGTH + 1))
 
         assertEquals("Text too long", vm.uiState.value.noteTextError)
         assertFalse(vm.saveButtonEnabled.value)
@@ -129,7 +129,7 @@ class EditNoteViewModelTest {
     @Test
     fun `updateNoteText clears the error back within the max length`() = runTest {
         val vm = createViewModel()
-        vm.updateNoteText("a".repeat(MAX_POST_TEXT_LENGTH + 1))
+        vm.updateNoteText("a".repeat(MAX_NOTE_TEXT_LENGTH + 1))
 
         vm.updateNoteText("Back within the limit")
 
@@ -238,7 +238,7 @@ class EditNoteViewModelTest {
     fun `hasUnsavedChanges is true for an edit too long to save`() = runTest {
         val vm = createViewModel()
 
-        vm.updateNoteText("a".repeat(MAX_POST_TEXT_LENGTH + 1))
+        vm.updateNoteText("a".repeat(MAX_NOTE_TEXT_LENGTH + 1))
 
         // Unsavable, but still an edit the user would lose -- hence not tied to saveButtonEnabled.
         assertFalse(vm.saveButtonEnabled.value)
@@ -246,15 +246,15 @@ class EditNoteViewModelTest {
     }
 
     @Test
-    fun `setShowDiscardDialog toggles the dialog flag`() = runTest {
+    fun `showDiscardDialog and dismissDiscardDialog toggle the dialog flag`() = runTest {
         val vm = createViewModel()
-        assertFalse(vm.uiState.value.showDiscardDialog)
+        assertFalse(vm.uiState.value.isDiscardDialogVisible)
 
-        vm.setShowDiscardDialog(true)
-        assertTrue(vm.uiState.value.showDiscardDialog)
+        vm.showDiscardDialog()
+        assertTrue(vm.uiState.value.isDiscardDialogVisible)
 
-        vm.setShowDiscardDialog(false)
-        assertFalse(vm.uiState.value.showDiscardDialog)
+        vm.dismissDiscardDialog()
+        assertFalse(vm.uiState.value.isDiscardDialogVisible)
     }
 
     // -------------------------------------------------------------------------
@@ -265,7 +265,7 @@ class EditNoteViewModelTest {
     fun `saveNote sends the edited note through the repository`() = runTest {
         val vm = createViewModel()
         vm.updateNoteText("  Updated text  ")
-        val saved = slot<HomeNote>()
+        val saved = slot<Note>()
         coEvery { noteRepository.updateNote(capture(saved)) } returns Result.success(Unit)
 
         vm.saveNote()
@@ -277,7 +277,7 @@ class EditNoteViewModelTest {
         assertEquals("Updated text", saved.captured.text) // trimmed
         // Untouched by an edit -- only the text is editable.
         assertEquals(testNote.mediaList, saved.captured.mediaList)
-        assertTrue(saved.captured.favorite) // preserved from the loaded note, not reset
+        assertTrue(saved.captured.isFavorite) // preserved from the loaded note, not reset
         assertEquals(testNote.username, saved.captured.username)
         assertTrue(vm.uiState.value.saveStatus is SaveStatus.Success)
         coVerify(exactly = 1) { noteRepository.updateNote(any()) }

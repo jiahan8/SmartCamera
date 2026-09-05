@@ -48,11 +48,11 @@ class SettingsViewModelTest {
     @Before
     fun setUp() {
         every { analyticsRepository.setUserId(any()) } just runs
-        every { analyticsRepository.logTextCustomEvent(any()) } just runs
+        every { analyticsRepository.logText(any()) } just runs
         every { errorHandler.logError(any()) } just runs
         every { errorHandler.getErrorMessage(any()) } returns "An error occurred"
-        every { userPreferencesRepository.userPreferencesFlow } returns
-                flowOf(UserPreferences(isDarkTheme = false, username = "", profilePicture = null))
+        every { userPreferencesRepository.userPreferences } returns
+                flowOf(UserPreferences(isDarkTheme = false, username = "", profilePictureUrl = null))
         every {
             resourceProvider.getString(CommonR.string.password_empty)
         } returns "Password cannot be empty"
@@ -187,7 +187,7 @@ class SettingsViewModelTest {
     @Test
     fun `showChangePasswordDialog sets dialogState to ChangePassword and clears fields`() {
         viewModel.showChangePasswordDialog()
-        viewModel.updateCurrentPasswordText("stale")
+        viewModel.updateCurrentPassword("stale")
         viewModel.dismissDialog()
 
         viewModel.showChangePasswordDialog()
@@ -201,9 +201,9 @@ class SettingsViewModelTest {
     @Test
     fun `dismissDialog while ChangePassword dialog open clears password fields`() {
         viewModel.showChangePasswordDialog()
-        viewModel.updateCurrentPasswordText("current")
-        viewModel.updateNewPasswordText("newPass1")
-        viewModel.updateConfirmNewPasswordText("newPass1")
+        viewModel.updateCurrentPassword("current")
+        viewModel.updateNewPassword("newPass1")
+        viewModel.updateConfirmNewPassword("newPass1")
 
         viewModel.dismissDialog()
 
@@ -215,10 +215,10 @@ class SettingsViewModelTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `updateNewPasswordText clears any existing newPasswordErrorMessage`() =
+    fun `updateNewPassword clears any existing newPasswordErrorMessage`() =
         runTest(mainDispatcherRule.testDispatcher) {
             viewModel.showChangePasswordDialog()
-            viewModel.updateCurrentPasswordText("current")
+            viewModel.updateCurrentPassword("current")
             viewModel.changePassword()
             advanceUntilIdle()
             assertEquals(
@@ -227,7 +227,7 @@ class SettingsViewModelTest {
                     .newPasswordErrorMessage
             )
 
-            viewModel.updateNewPasswordText("newPass1")
+            viewModel.updateNewPassword("newPass1")
 
             assertEquals(
                 null,
@@ -237,10 +237,10 @@ class SettingsViewModelTest {
         }
 
     @Test
-    fun `updateConfirmNewPasswordText mismatch sets confirmNewPasswordErrorMessage`() {
+    fun `updateConfirmNewPassword mismatch sets confirmNewPasswordErrorMessage`() {
         viewModel.showChangePasswordDialog()
-        viewModel.updateNewPasswordText("newPass1")
-        viewModel.updateConfirmNewPasswordText("different")
+        viewModel.updateNewPassword("newPass1")
+        viewModel.updateConfirmNewPassword("different")
         assertEquals(
             "Passwords do not match",
             (viewModel.uiState.value.dialogState as SettingsDialogState.ChangePassword)
@@ -249,10 +249,10 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `updateConfirmNewPasswordText match clears confirmNewPasswordErrorMessage`() {
+    fun `updateConfirmNewPassword match clears confirmNewPasswordErrorMessage`() {
         viewModel.showChangePasswordDialog()
-        viewModel.updateNewPasswordText("newPass1")
-        viewModel.updateConfirmNewPasswordText("newPass1")
+        viewModel.updateNewPassword("newPass1")
+        viewModel.updateConfirmNewPassword("newPass1")
         assertEquals(
             null,
             (viewModel.uiState.value.dialogState as SettingsDialogState.ChangePassword)
@@ -264,7 +264,7 @@ class SettingsViewModelTest {
     fun `changePassword with blank new password does not call repository`() =
         runTest(mainDispatcherRule.testDispatcher) {
             viewModel.showChangePasswordDialog()
-            viewModel.updateCurrentPasswordText("current")
+            viewModel.updateCurrentPassword("current")
             viewModel.changePassword()
             advanceUntilIdle()
 
@@ -280,9 +280,9 @@ class SettingsViewModelTest {
     fun `changePassword with mismatched confirm password does not call repository`() =
         runTest(mainDispatcherRule.testDispatcher) {
             viewModel.showChangePasswordDialog()
-            viewModel.updateCurrentPasswordText("current")
-            viewModel.updateNewPasswordText("newPass1")
-            viewModel.updateConfirmNewPasswordText("different")
+            viewModel.updateCurrentPassword("current")
+            viewModel.updateNewPassword("newPass1")
+            viewModel.updateConfirmNewPassword("different")
             viewModel.changePassword()
             advanceUntilIdle()
 
@@ -301,9 +301,9 @@ class SettingsViewModelTest {
                     Result.success(Unit)
 
             viewModel.showChangePasswordDialog()
-            viewModel.updateCurrentPasswordText("current")
-            viewModel.updateNewPasswordText("newPass1")
-            viewModel.updateConfirmNewPasswordText("newPass1")
+            viewModel.updateCurrentPassword("current")
+            viewModel.updateNewPassword("newPass1")
+            viewModel.updateConfirmNewPassword("newPass1")
 
             viewModel.changePasswordEvent.test {
                 viewModel.changePassword()
@@ -329,9 +329,9 @@ class SettingsViewModelTest {
             }
 
             viewModel.showChangePasswordDialog()
-            viewModel.updateCurrentPasswordText("current")
-            viewModel.updateNewPasswordText("newPass1")
-            viewModel.updateConfirmNewPasswordText("newPass1")
+            viewModel.updateCurrentPassword("current")
+            viewModel.updateNewPassword("newPass1")
+            viewModel.updateConfirmNewPassword("newPass1")
 
             viewModel.changePassword()
             runCurrent()
@@ -353,9 +353,9 @@ class SettingsViewModelTest {
             every { errorHandler.getErrorMessage(exception) } returns "wrong password"
 
             viewModel.showChangePasswordDialog()
-            viewModel.updateCurrentPasswordText("wrong")
-            viewModel.updateNewPasswordText("newPass1")
-            viewModel.updateConfirmNewPasswordText("newPass1")
+            viewModel.updateCurrentPassword("wrong")
+            viewModel.updateNewPassword("newPass1")
+            viewModel.updateConfirmNewPassword("newPass1")
             viewModel.changePassword()
             advanceUntilIdle()
 
@@ -380,37 +380,37 @@ class SettingsViewModelTest {
         }
 
     @Test
-    fun `resetActionError resets uiState to Idle`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `dismissError resets uiState to Idle`() = runTest(mainDispatcherRule.testDispatcher) {
         val exception = RuntimeException("err")
         coEvery { authRepository.signOut() } returns Result.failure(exception)
         viewModel.signOut()
         advanceUntilIdle()
 
-        viewModel.resetActionError()
+        viewModel.dismissError()
 
         assertEquals(SettingsStatus.Idle, viewModel.uiState.value.status)
     }
 
     @Test
-    fun `updateDarkThemeVisibility delegates to userPreferencesRepository`() =
+    fun `setDarkTheme delegates to userPreferencesRepository`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            coEvery { userPreferencesRepository.updateDarkThemeVisibility(true) } returns
+            coEvery { userPreferencesRepository.setDarkTheme(true) } returns
                     Result.success(Unit)
 
-            viewModel.updateDarkThemeVisibility(true)
+            viewModel.setDarkTheme(true)
             advanceUntilIdle()
 
-            coVerify { userPreferencesRepository.updateDarkThemeVisibility(true) }
+            coVerify { userPreferencesRepository.setDarkTheme(true) }
         }
 
     @Test
-    fun `updateDarkThemeVisibility failure is logged silently`() =
+    fun `setDarkTheme failure is logged silently`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val exception = RuntimeException("pref error")
-            coEvery { userPreferencesRepository.updateDarkThemeVisibility(any()) } returns
+            coEvery { userPreferencesRepository.setDarkTheme(any()) } returns
                     Result.failure(exception)
 
-            viewModel.updateDarkThemeVisibility(false)
+            viewModel.setDarkTheme(false)
             advanceUntilIdle()
 
             verify { errorHandler.logError(exception) }

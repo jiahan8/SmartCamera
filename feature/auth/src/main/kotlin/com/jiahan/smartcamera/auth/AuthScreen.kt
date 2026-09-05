@@ -49,7 +49,7 @@ import com.jiahan.smartcamera.common.PasswordField
 import com.jiahan.smartcamera.common.bounceScale
 import com.jiahan.smartcamera.core.common.R as CommonR
 import com.jiahan.smartcamera.feature.auth.R
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,7 +68,7 @@ fun AuthScreen(
     val password = uiState.password
     val displayName = uiState.displayName
     val username = uiState.username
-    val passwordVisible = uiState.passwordVisible
+    val isPasswordVisible = uiState.isPasswordVisible
     val authStatus = uiState.status
     val isLoading = authStatus is AuthStatus.Loading
     val isLoginMode = uiState.isLoginMode
@@ -101,7 +101,7 @@ fun AuthScreen(
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { viewModel.updateEmailText(it) },
+                onValueChange = viewModel::updateEmail,
                 label = { Text(stringResource(CommonR.string.email)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
@@ -116,7 +116,7 @@ fun AuthScreen(
             if (!isLoginMode) {
                 OutlinedTextField(
                     value = displayName,
-                    onValueChange = { viewModel.updateDisplayNameText(it) },
+                    onValueChange = viewModel::updateDisplayName,
                     label = { Text(stringResource(CommonR.string.name)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
@@ -127,7 +127,7 @@ fun AuthScreen(
 
                 OutlinedTextField(
                     value = username,
-                    onValueChange = { viewModel.updateUsernameText(it) },
+                    onValueChange = viewModel::updateUsername,
                     label = { Text(stringResource(CommonR.string.username)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
@@ -141,10 +141,10 @@ fun AuthScreen(
 
             PasswordField(
                 value = password,
-                onValueChange = { viewModel.updatePasswordText(it) },
+                onValueChange = viewModel::updatePassword,
                 label = stringResource(R.string.password),
-                visible = passwordVisible,
-                onVisibilityChange = { viewModel.updatePasswordVisibility(it) },
+                visible = isPasswordVisible,
+                onVisibilityChange = viewModel::updatePasswordVisibility,
                 modifier = Modifier.fillMaxWidth(),
                 imeAction = ImeAction.Done,
                 keyboardActions = KeyboardActions(
@@ -177,7 +177,7 @@ fun AuthScreen(
 
             val submitInteractionSource = remember { MutableInteractionSource() }
             Button(
-                onClick = { viewModel.submit() },
+                onClick = viewModel::submit,
                 interactionSource = submitInteractionSource,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -208,18 +208,18 @@ fun AuthScreen(
                 )
             }
 
-            TextButton(onClick = { viewModel.toggleAuthMode() }) {
+            TextButton(onClick = viewModel::toggleAuthMode) {
                 Text(stringResource(if (isLoginMode) R.string.need_account else R.string.already_have_account))
             }
 
             if (isLoginMode) {
-                TextButton(onClick = { viewModel.resetPassword() }) {
+                TextButton(onClick = viewModel::resetPassword) {
                     Text(stringResource(R.string.forgot_password))
                 }
             }
 
-            if (uiState.showResendButton) {
-                TextButton(onClick = { viewModel.resendVerificationEmail() }) {
+            if (uiState.isResendButtonVisible) {
+                TextButton(onClick = viewModel::resendVerificationEmail) {
                     Text(stringResource(R.string.resend_verification_email))
                 }
             }
@@ -230,7 +230,7 @@ fun AuthScreen(
 @Preview(showBackground = true, name = "Auth – Login mode")
 @Composable
 private fun AuthScreenLoginPreview() {
-    SmartCameraTheme {
+    SmartPhotosTheme {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

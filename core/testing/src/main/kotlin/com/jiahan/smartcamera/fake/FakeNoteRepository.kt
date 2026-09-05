@@ -1,9 +1,9 @@
 package com.jiahan.smartcamera.fake
 
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
 import com.jiahan.smartcamera.domain.MediaDetail
 import com.jiahan.smartcamera.domain.MediaUri
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.domain.NoteCursor
 import com.jiahan.smartcamera.domain.NoteMediaDetail
 import com.jiahan.smartcamera.domain.NotePage
@@ -28,17 +28,17 @@ import kotlinx.coroutines.flow.update
 class FakeNoteRepository : NoteRepository {
 
     var notesResult: Result<NotePage> = Result.success(NotePage(emptyList()))
-    var searchResult: Result<List<HomeNote>> = Result.success(emptyList())
+    var searchResult: Result<List<Note>> = Result.success(emptyList())
     var deleteResult: Result<Unit> = Result.success(Unit)
     var favoriteResult: Result<Unit> = Result.success(Unit)
     var updateResult: Result<Unit> = Result.success(Unit)
     var addNoteResult: Result<Unit> = Result.success(Unit)
-    var getNoteResult: Result<HomeNote>? = null
+    var getNoteResult: Result<Note>? = null
     var syncResult: Result<Unit> = Result.success(Unit)
     var buildLocalMediaDetailsResult: Result<List<NoteMediaDetail>> = Result.success(emptyList())
 
-    private val notesFlow = MutableStateFlow<List<HomeNote>>(emptyList())
-    private val favoritesFlow = MutableStateFlow<List<HomeNote>>(emptyList())
+    private val notesFlow = MutableStateFlow<List<Note>>(emptyList())
+    private val favoritesFlow = MutableStateFlow<List<Note>>(emptyList())
 
     var notesCallCount = 0
     var lastNotesCursor: NoteCursor? = null
@@ -47,21 +47,21 @@ class FakeNoteRepository : NoteRepository {
     var updateCallCount = 0
     var addNoteCallCount = 0
     var lastDeletedNoteId: String? = null
-    var lastFavoritedNote: HomeNote? = null
-    var lastUpdatedNote: HomeNote? = null
-    var lastAddedNote: HomeNote? = null
+    var lastFavoritedNote: Note? = null
+    var lastUpdatedNote: Note? = null
+    var lastAddedNote: Note? = null
 
-    fun setFavorites(notes: List<HomeNote>) {
+    fun setFavorites(notes: List<Note>) {
         favoritesFlow.value = notes
     }
 
     /** Seeds the mirror [getNotesStream] observes, the way a fetched page would. */
-    fun setNotesStream(notes: List<HomeNote>) {
+    fun setNotesStream(notes: List<Note>) {
         notesFlow.value = notes
     }
 
     /** Stubs a successful page. [nextCursor] drives pagination independently of [notes].size. */
-    fun setNotes(notes: List<HomeNote>, nextCursor: NoteCursor? = null) {
+    fun setNotes(notes: List<Note>, nextCursor: NoteCursor? = null) {
         notesResult = Result.success(NotePage(notes, nextCursor))
     }
 
@@ -78,7 +78,7 @@ class FakeNoteRepository : NoteRepository {
     }
 
     /** Upserts by note id, keeping insertion order -- the table's `ORDER BY created_date DESC`. */
-    private fun mirror(notes: List<HomeNote>) {
+    private fun mirror(notes: List<Note>) {
         notesFlow.update { existing ->
             val refreshed = existing.map { old ->
                 notes.firstOrNull { it.noteId == old.noteId } ?: old
@@ -87,30 +87,30 @@ class FakeNoteRepository : NoteRepository {
         }
     }
 
-    private fun matchesQuery(note: HomeNote, query: String): Boolean =
+    private fun matchesQuery(note: Note, query: String): Boolean =
         query.isBlank() ||
                 note.text?.contains(query, ignoreCase = true) == true ||
                 note.username.contains(query, ignoreCase = true)
 
-    override suspend fun addNote(homeNote: HomeNote): Result<Unit> {
+    override suspend fun addNote(note: Note): Result<Unit> {
         addNoteCallCount++
-        lastAddedNote = homeNote
+        lastAddedNote = note
         return addNoteResult
     }
 
-    override suspend fun updateNote(homeNote: HomeNote): Result<Unit> {
+    override suspend fun updateNote(note: Note): Result<Unit> {
         updateCallCount++
-        lastUpdatedNote = homeNote
+        lastUpdatedNote = note
         // Unconditional, matching the real repository once its favorite gate was dropped.
         if (updateResult.isSuccess) {
             notesFlow.update { notes ->
-                notes.map { if (it.noteId == homeNote.noteId) homeNote else it }
+                notes.map { if (it.noteId == note.noteId) note else it }
             }
         }
         return updateResult
     }
 
-    override suspend fun searchNotes(query: String): Result<List<HomeNote>> {
+    override suspend fun searchNotes(query: String): Result<List<Note>> {
         // Mirrors the real repository writing its results through, so searchNotesStream can cover
         // notes the feed never paged.
         searchResult.getOrNull()?.let { mirror(it) }
@@ -130,15 +130,15 @@ class FakeNoteRepository : NoteRepository {
         return deleteResult
     }
 
-    override suspend fun favoriteNote(homeNote: HomeNote): Result<Unit> {
+    override suspend fun toggleFavorite(note: Note): Result<Unit> {
         favoriteCallCount++
-        lastFavoritedNote = homeNote
+        lastFavoritedNote = note
         // Mirrors getFavoriteNotesStream reactively reflecting the toggle (added when newly
         // favorited, dropped when un-favorited). Note this models the *stream*, not the table:
         // the real repository stopped deleting the row on unfavorite when Room became the feed's
         // mirror, but that query is `WHERE favorite = 1`, so what a subscriber sees is unchanged.
         if (favoriteResult.isSuccess) {
-            val toggled = homeNote.copy(favorite = !homeNote.favorite)
+            val toggled = note.copy(isFavorite = !note.isFavorite)
             // The note keeps its row either way, flag flipped -- the real repository upserts in
             // both directions now rather than deleting on unfavorite.
             notesFlow.update { notes ->
@@ -147,10 +147,10 @@ class FakeNoteRepository : NoteRepository {
             }
             favoritesFlow.update { notes ->
                 when {
-                    toggled.favorite && notes.none { it.noteId == toggled.noteId } ->
+                    toggled.isFavorite && notes.none { it.noteId == toggled.noteId } ->
                         notes + toggled
 
-                    !toggled.favorite ->
+                    !toggled.isFavorite ->
                         notes.filterNot { it.noteId == toggled.noteId }
 
                     else -> notes.map { if (it.noteId == toggled.noteId) toggled else it }
@@ -160,18 +160,18 @@ class FakeNoteRepository : NoteRepository {
         return favoriteResult
     }
 
-    override suspend fun getNote(noteId: String): Result<HomeNote> {
+    override suspend fun getNote(noteId: String): Result<Note> {
         val result = getNoteResult ?: Result.failure(NoSuchElementException("No note for $noteId"))
         result.getOrNull()?.let { mirror(listOf(it)) }
         return result
     }
 
-    override suspend fun quickUploadMediaToFirebase(
+    override suspend fun uploadMediaToCache(
         uriList: List<MediaUri>,
         deleteAfterUpload: Boolean
     ) = Unit
 
-    override suspend fun uploadMediaToFirebase(
+    override suspend fun uploadMedia(
         noteMediaDetailList: List<NoteMediaDetail>
     ): Result<List<MediaDetail>> = Result.success(emptyList())
 
@@ -179,16 +179,16 @@ class FakeNoteRepository : NoteRepository {
         uriList: List<MediaUri>
     ): Result<List<NoteMediaDetail>> = buildLocalMediaDetailsResult
 
-    override fun getNotesStream(limit: Int): Flow<List<HomeNote>> =
+    override fun getNotesStream(limit: Int): Flow<List<Note>> =
         notesFlow.map { notes -> notes.take(limit) }
 
-    override fun getNoteStream(noteId: String): Flow<HomeNote?> =
+    override fun getNoteStream(noteId: String): Flow<Note?> =
         notesFlow.map { notes -> notes.firstOrNull { it.noteId == noteId } }
 
-    override fun searchNotesStream(query: String): Flow<List<HomeNote>> =
+    override fun searchNotesStream(query: String): Flow<List<Note>> =
         notesFlow.map { notes -> notes.filter { matchesQuery(it, query) } }
 
-    override fun getFavoriteNotesStream(query: String): Flow<List<HomeNote>> =
+    override fun getFavoriteNotesStream(query: String): Flow<List<Note>> =
         favoritesFlow.map { notes ->
             if (query.isBlank()) {
                 notes

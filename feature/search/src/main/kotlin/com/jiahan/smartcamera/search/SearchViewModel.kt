@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jiahan.smartcamera.data.repository.AnalyticsRepository
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.util.AppConstants.DEBOUNCE_MS
@@ -38,14 +38,14 @@ import kotlin.time.Duration.Companion.milliseconds
 sealed interface SearchContent {
     data object Idle : SearchContent
     data object Loading : SearchContent
-    data class Success(val notes: List<HomeNote>) : SearchContent
+    data class Success(val notes: List<Note>) : SearchContent
     data class Error(val message: String) : SearchContent
 }
 
 data class SearchUiState(
     val searchQuery: String = "",
     val isRefreshing: Boolean = false,
-    val noteToDelete: HomeNote? = null
+    val noteToDelete: Note? = null
 )
 
 /**
@@ -122,7 +122,7 @@ class SearchViewModel @Inject constructor(
      * deleted, favorited or edited on another screen updates here with no `NoteHandler` event to
      * collect, and none of the three list transforms this ViewModel used to apply by hand.
      */
-    private val results: Flow<List<HomeNote>> = debouncedQuery.flatMapLatest { query ->
+    private val results: Flow<List<Note>> = debouncedQuery.flatMapLatest { query ->
         if (query.isBlank()) flowOf(emptyList()) else noteRepository.searchNotesStream(query)
     }
 
@@ -155,8 +155,8 @@ class SearchViewModel @Inject constructor(
 
     fun updateSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
-        analyticsRepository.logSearchCustomEvent(query)
-        analyticsRepository.logSearchEvent(query)
+        analyticsRepository.logNoteSearch(query)
+        analyticsRepository.logSearch(query)
     }
 
     fun logImageLoadError(throwable: Throwable) {
@@ -203,18 +203,18 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    fun favoriteNote(homeNote: HomeNote) {
+    fun toggleFavorite(note: Note) {
         viewModelScope.launch {
-            noteRepository.favoriteNote(homeNote)
+            noteRepository.toggleFavorite(note)
                 .onFailure { e -> noteErrorReporter.reportError(e) }
         }
     }
 
-    fun setNoteToDelete(note: HomeNote?) {
+    fun setNoteToDelete(note: Note?) {
         _uiState.update { it.copy(noteToDelete = note) }
     }
 
-    fun shareNote(note: HomeNote) {
+    fun shareNote(note: Note) {
         viewModelScope.launch { noteShare.shareNote(note) }
     }
 }

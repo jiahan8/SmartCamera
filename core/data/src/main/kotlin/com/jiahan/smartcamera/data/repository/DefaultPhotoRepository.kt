@@ -14,9 +14,9 @@ class DefaultPhotoRepository @Inject constructor(
     companion object {
         private const val FUNCTION_LIST_UNSPLASH_PHOTOS = "listUnsplashPhotos"
         private const val FUNCTION_SEARCH_UNSPLASH_PHOTOS = "searchUnsplashPhotos"
-        private const val FIELD_PAGE = "page"
-        private const val FIELD_PER_PAGE = "perPage"
-        private const val FIELD_QUERY = "query"
+        private const val ARG_PAGE = "page"
+        private const val ARG_PER_PAGE = "perPage"
+        private const val ARG_QUERY = "query"
         private const val FIELD_PHOTOS = "photos"
         private const val FIELD_ID = "id"
         private const val FIELD_DESCRIPTION = "description"
@@ -39,7 +39,7 @@ class DefaultPhotoRepository @Inject constructor(
 
     override suspend fun listPhotos(page: Int, pageSize: Int): Result<PhotoPage> = safeCall {
         val result = functions.getHttpsCallable(FUNCTION_LIST_UNSPLASH_PHOTOS)
-            .call(hashMapOf(FIELD_PAGE to page, FIELD_PER_PAGE to pageSize))
+            .call(hashMapOf(ARG_PAGE to page, ARG_PER_PAGE to pageSize))
             .await()
         toPhotoPage(result.data, pageSize)
     }
@@ -50,7 +50,7 @@ class DefaultPhotoRepository @Inject constructor(
         pageSize: Int
     ): Result<PhotoPage> = safeCall {
         val result = functions.getHttpsCallable(FUNCTION_SEARCH_UNSPLASH_PHOTOS)
-            .call(hashMapOf(FIELD_QUERY to query, FIELD_PAGE to page, FIELD_PER_PAGE to pageSize))
+            .call(hashMapOf(ARG_QUERY to query, ARG_PAGE to page, ARG_PER_PAGE to pageSize))
             .await()
         toPhotoPage(result.data, pageSize)
     }
@@ -71,25 +71,25 @@ class DefaultPhotoRepository @Inject constructor(
     private fun parsePhoto(map: Map<*, *>): Photo? {
         val id = map[FIELD_ID] as? String ?: return null
         val urls = map[FIELD_URLS] as? Map<*, *> ?: return null
-        val imageUrl =
+        val photoUrl =
             (urls[FIELD_URL_REGULAR] ?: urls[FIELD_URL_FULL] ?: urls[FIELD_URL_RAW]) as? String
                 ?: return null
-        val thumbUrl = (urls[FIELD_URL_SMALL] ?: urls[FIELD_URL_THUMB]) as? String ?: imageUrl
+        val thumbnailUrl = (urls[FIELD_URL_SMALL] ?: urls[FIELD_URL_THUMB]) as? String ?: photoUrl
         val user = map[FIELD_USER] as? Map<*, *>
         val profileImage = user?.get(FIELD_USER_PROFILE_IMAGE) as? Map<*, *>
         return Photo(
             id = id,
             description = map[FIELD_DESCRIPTION] as? String
                 ?: map[FIELD_ALT_DESCRIPTION] as? String,
-            imageUrl = imageUrl,
-            thumbUrl = thumbUrl,
+            photoUrl = photoUrl,
+            thumbnailUrl = thumbnailUrl,
             width = (map[FIELD_WIDTH] as? Number)?.toInt() ?: 0,
             height = (map[FIELD_HEIGHT] as? Number)?.toInt() ?: 0,
             color = map[FIELD_COLOR] as? String,
             likes = (map[FIELD_LIKES] as? Number)?.toInt() ?: 0,
             username = (user?.get(FIELD_USER_NAME) as? String)
                 ?: (user?.get(FIELD_USER_USERNAME) as? String) ?: "",
-            userProfileImageUrl = profileImage?.get(FIELD_URL_SMALL) as? String
+            profilePictureUrl = profileImage?.get(FIELD_URL_SMALL) as? String
         )
     }
 }

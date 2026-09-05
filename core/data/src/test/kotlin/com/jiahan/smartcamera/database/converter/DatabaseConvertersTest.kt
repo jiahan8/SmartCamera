@@ -80,19 +80,19 @@ class DatabaseConvertersTest {
     }
 
     // -------------------------------------------------------------------------
-    // Round-trip: generatedText
+    // Round-trip: generatedTexts
     // -------------------------------------------------------------------------
 
     @Test
-    fun `generatedText survives round-trip`() {
+    fun `generatedTexts survives round-trip`() {
         val original = listOf(
             MediaDetail(
                 photoUrl = "https://example.com/photo.jpg",
-                generatedText = listOf("a cat", "a dog")
+                generatedTexts = listOf("a cat", "a dog")
             )
         )
         val restored = requireNotNull(converters.toMediaList(converters.fromMediaList(original)))
-        assertEquals(listOf("a cat", "a dog"), restored[0].generatedText)
+        assertEquals(listOf("a cat", "a dog"), restored[0].generatedTexts)
     }
 
     // -------------------------------------------------------------------------
@@ -204,7 +204,7 @@ class DatabaseConvertersTest {
             MediaDetail(videoUrl = "https://example.com/2.mp4", isVideo = true),
             MediaDetail(
                 photoUrl = "https://example.com/3.jpg",
-                generatedText = listOf("sunset"),
+                generatedTexts = listOf("sunset"),
                 generatedLabels = listOf(DetectedLabel("sky", 0.9))
             )
         )
@@ -213,7 +213,7 @@ class DatabaseConvertersTest {
         assertEquals(3, restored.size)
         assertEquals("https://example.com/1.jpg", restored[0].photoUrl)
         assertEquals("https://example.com/2.mp4", restored[1].videoUrl)
-        assertEquals(listOf("sunset"), restored[2].generatedText)
+        assertEquals(listOf("sunset"), restored[2].generatedTexts)
         assertEquals(1, requireNotNull(restored[2].generatedLabels).size)
     }
 
@@ -229,7 +229,7 @@ class DatabaseConvertersTest {
         assertNull(restored[0].photoUrl)
         assertNull(restored[0].videoUrl)
         assertNull(restored[0].thumbnailUrl)
-        assertNull(restored[0].generatedText)
+        assertNull(restored[0].generatedTexts)
         assertNull(restored[0].generatedObjects)
         assertNull(restored[0].generatedLabels)
         assertNull(restored[0].generatedLandmarks)
@@ -269,7 +269,7 @@ class DatabaseConvertersTest {
         assertNull(photo.videoUrl)
         assertNull(photo.thumbnailUrl)
         assertEquals(false, photo.isVideo)
-        assertEquals(listOf("a cat", "a dog"), photo.generatedText)
+        assertEquals(listOf("a cat", "a dog"), photo.generatedTexts)
         assertEquals("cat", requireNotNull(photo.generatedObjects)[0].objectName)
         assertEquals(0.95, requireNotNull(photo.generatedObjects)[0].score, 0.001)
         assertEquals("outdoor", requireNotNull(photo.generatedLabels)[0].label)
@@ -282,7 +282,7 @@ class DatabaseConvertersTest {
         assertEquals("https://example.com/thumb.jpg", video.thumbnailUrl)
         assertTrue(video.isVideo)
         assertNull(video.photoUrl)
-        assertNull(video.generatedText)
+        assertNull(video.generatedTexts)
     }
 
     /**

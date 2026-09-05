@@ -13,9 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
 class DefaultAppUpdateRepository @Inject constructor(
     private val appUpdateManager: AppUpdateManager
 ) : AppUpdateRepository {

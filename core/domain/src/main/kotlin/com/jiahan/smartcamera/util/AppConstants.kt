@@ -13,7 +13,7 @@ object AppConstants {
     const val UNSPLASH_MAX_PAGE_SIZE = 30
 
     // Text limits
-    const val MAX_POST_TEXT_LENGTH = 500
+    const val MAX_NOTE_TEXT_LENGTH = 500
     const val MAX_USERNAME_LENGTH = 30
     const val MAX_DISPLAY_NAME_LENGTH = 50
 

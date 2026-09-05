@@ -226,7 +226,7 @@ the Firestore collections, and the Cloud Functions' division of labour.
   entities — across the interface boundary. **Every fallible operation returns `Result<T>` rather
   than throwing** (wrap the body in `util/safeCall`), so callers never wrap a call in try/catch. The
   exemptions are the ones that can't carry a `Result`: a `Flow`-returning stream, and
-  fire-and-forget work like `quickUploadMediaToFirebase`, which logs its failures internally.
+  fire-and-forget work like `uploadMediaToCache`, which logs its failures internally.
 - **A local media location crosses the domain boundary as `domain/MediaUri.kt`, never
   `android.net.Uri`** — convert with `toMediaUri()`/`toPlatformUri()` (`util/MediaUriExt.kt`,
   `:core:common`) at the ViewModel boundary on the way down, or inside a `Default*` on the way out.
@@ -401,16 +401,34 @@ required parameter can never be taken positionally, forcing every caller past th
 arguments.
 
 **The exception is a trailing lambda, which stays last even though the parameters before it carry
-defaults** — `bounceClick`'s `onClick`, `SearchBar`'s `placeholder` and `SmartCameraTheme`'s
+defaults** — `bounceClick`'s `onClick`, `SearchBar`'s `placeholder` and `SmartPhotosTheme`'s
 `content`, matching Material3's own shape (`Button(onClick, modifier, enabled, …, content)`). Those
 three are the only places a defaulted parameter should precede a required one.
+
+### Callback forwarding
+
+**When a callback body is exactly one call that forwards its parameters unchanged, pass a bound
+reference instead of wrapping it in a lambda** — `onClick = viewModel::changePassword`,
+`onValueChange = viewModel::updateNoteText`. Keep a lambda when the body does anything else: several
+statements, a condition, or any transformation of the argument.
+
+Two things this is *not* about:
+
+- **Not performance.** Older Compose compilers memoized capturing lambdas but not bound references,
+  so `::` could defeat skipping; that is fixed on the versions pinned here and both forms memoize
+  alike. Choose on readability — the reference form wins mainly because it deletes a meaningless
+  `it`.
+- **Not always available.** A parameter whose type carries a receiver rejects a bound reference:
+  `KeyboardActions`'s `onDone` is `KeyboardActionScope.() -> Unit`, so it keeps its lambda even
+  where the identical call one argument away takes a reference. `SettingsScreen` calls
+  `changePassword` both ways, seven lines apart — that is the type system, not an oversight.
 
 ### One-off UI events
 
 Snackbars and other fire-and-forget signals travel from ViewModel to screen on a
 `MutableSharedFlow(extraBufferCapacity = 1)` exposed as a read-only `SharedFlow`, collected in the
 screen's `LaunchedEffect` and shown through `SnackbarHostState`. `actionError` (via `:core:common`'s
-`NoteErrorReporter`) and `ProfileViewModel.events` are the existing instances — **follow their shape
+`NoteErrorReporter`) and `ProfileViewModel.profileEvent` are the existing instances — **follow their shape
 rather than inventing a third.**
 
 This deviates from the [official guidance](https://developer.android.com/topic/architecture/ui-layer/events)
@@ -544,7 +562,7 @@ directions:**
 paginating at once can't corrupt each other. The key depends on the source: notes page by an opaque
 `NoteCursor` (`getNotes(cursor)` returns a `NotePage` carrying the next one, null = first page),
 Explore by page index. The ViewModel keeps that key plus `pageSize` (defaulting to
-`AppConstants.DEFAULT_PAGE_SIZE` in `:core:domain`) and `hasMoreData`, with
+`AppConstants.DEFAULT_PAGE_SIZE` in `:core:domain`) and `hasMore`, with
 `isRefreshing`/`isLoadingMore` as fields on the `*UiState` (not separate `StateFlow`s).
 
 - **Derive "is there another page" from the rows the data source returned, never from the mapped
@@ -575,6 +593,38 @@ rather than branched on (`versionName`, `logoRes`), hoist it as a parameter inst
 - **Cloud Functions style is enforced by `eslint-config-google`** — run the functions lint command
   before committing changes under `functions/`.
 
+### Naming
+
+The domain vocabulary is fixed. Each rule below exists because the codebase had drifted into two or
+more words for one thing, and the drift was invisible until every call site was read at once.
+
+- **`photo` is content the user sees, `image` is a bitmap being loaded, `profilePicture` is an
+  avatar.** `Photo.photoUrl` and `MediaDetail.photoUrl` are content; `isImageLoading`,
+  `onImageLoadError` and `ErrorTag.IMAGE_LOAD` belong to Coil and cover avatars and video posters
+  too. **A local holding "the URL to render" stays `imageUrl` even beside a photo** — for a video it
+  is the thumbnail, so `photoUrl` there would be false (see `MediaThumbnail`).
+- **A profile picture URL is `profilePictureUrl` everywhere** — on `User`, `UserPreferences`, `Note`
+  and `Photo`. The bare `profilePicture` is reserved for the `ProfilePictureUpdate` tri-state, which
+  describes a change rather than holding a URL.
+- **A Flow-returning function keyed by an argument is `get<X>Stream(key)`; an unkeyed live value is
+  `observe<X>()`; a Flow property takes no suffix** — `getNoteStream(noteId)`,
+  `observeExploreIconVisible()`, `userPreferences`. Never a `Flow` suffix.
+- **A one-off event stream is `<subject>Event`, singular** — `shareEvent`, `navigationEvent`,
+  `changePasswordEvent`, `profileEvent`. `actionError` is the deliberate exception: its payload is a
+  message rather than an event type, and it is shared through `NoteErrorReporter`.
+- **A dialog or sheet is toggled by `show<X>()`/`dismiss<X>()`, never a `Boolean` setter**, and the
+  field it writes is `is<X>Visible`.
+- **A setter is named for the field it writes**, which is what settles whether a `Text` suffix is
+  redundant. `updateEmail` writes `email`, so `updateEmailText` said it twice; `updateNoteText`
+  writes `noteText`, so its suffix is the field's name rather than a restatement of its type and
+  stays. The suffix also earns its keep there by separating "edit the note's text" from
+  `NoteRepository.updateNote`, which writes the whole note.
+- **A domain model is named for what it is, not for the screen that first rendered it** — the note
+  model is `Note`, not `HomeNote`, because five features read it.
+- **A name states what the thing does.** `toggleFavorite` toggles rather than only favorites;
+  `buildNote` builds rather than fetches; `recomputeFormState` mutates, where a `check*` name would
+  have read as a query.
+
 ### Kotlin coding conventions
 
 Beyond the official style guide (`kotlin.code.style=official`):
@@ -584,7 +634,7 @@ Beyond the official style guide (`kotlin.code.style=official`):
   still mutate underneath them, so when a property or return value is backed by a mutable field,
   copy at the boundary (`.toList()`).
 - **Prefer a sealed type over a nullable field** where both express the same state.
-- **Name booleans and boolean-returning functions as predicates** (`isRefreshing`, `hasMoreData`,
+- **Name booleans and boolean-returning functions as predicates** (`isRefreshing`, `hasMore`,
   `canRetry`).
 
 ### Formatting

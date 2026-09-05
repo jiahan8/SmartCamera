@@ -41,19 +41,28 @@ fun FavoriteScreen(
     onNavigateToEditNote: (noteId: String) -> Unit,
     onNavigateToPhotoPreview: (url: String) -> Unit,
     onNavigateToVideoPreview: (url: String) -> Unit,
-    scrollToTop: Long?,
+    scrollToTopRequestedAt: Long?,
     onScrollToTopConsumed: () -> Unit,
     snackbarHostState: SnackbarHostState,
-    onScrollDirectionChanged: (Boolean) -> Unit = {},
+    onScrollDirectionChanged: (isScrollingUp: Boolean) -> Unit = {},
     viewModel: FavoriteViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val pullToRefreshState = rememberPullToRefreshState()
     val listState = rememberLazyListState()
 
-    val content by viewModel.content.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val content by viewModel.content.collectAsStateWithLifecycle()
     val searchQuery = uiState.searchQuery
+
+    ScrollDirectionEffect(listState, onScrollDirectionChanged)
+
+    ScrollToTopEffect(
+        scrollToTopRequestedAt = scrollToTopRequestedAt,
+        listState = listState,
+        hasItems = (content as? FavoriteContent.Success)?.notes?.isNotEmpty() == true,
+        onConsumed = onScrollToTopConsumed
+    )
 
     LaunchedEffect(Unit) {
         viewModel.actionError.collect { message ->
@@ -70,15 +79,6 @@ fun FavoriteScreen(
             intentBuilder.startChooser()
         }
     }
-
-    ScrollDirectionEffect(listState, onScrollDirectionChanged)
-
-    ScrollToTopEffect(
-        scrollToTop = scrollToTop,
-        listState = listState,
-        hasItems = (content as? FavoriteContent.Success)?.notes?.isNotEmpty() == true,
-        onConsumed = onScrollToTopConsumed
-    )
 
     uiState.noteToDelete?.let { note ->
         DeleteNoteConfirmationDialog(
@@ -130,7 +130,7 @@ fun FavoriteScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 state = pullToRefreshState,
                                 isRefreshing = uiState.isRefreshing,
-                                onRefresh = { viewModel.refresh() },
+                                onRefresh = viewModel::refresh,
                             ) {
                                 LazyColumn(
                                     state = listState,
@@ -149,8 +149,8 @@ fun FavoriteScreen(
                                             onEditNote = {
                                                 onNavigateToEditNote(note.noteId)
                                             },
-                                            onFavoriteNote = {
-                                                viewModel.favoriteNote(note)
+                                            onToggleFavorite = {
+                                                viewModel.toggleFavorite(note)
                                             },
                                             onDeleteNote = {
                                                 viewModel.setNoteToDelete(note)

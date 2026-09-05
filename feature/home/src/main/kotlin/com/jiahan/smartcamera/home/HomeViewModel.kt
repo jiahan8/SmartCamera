@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jiahan.smartcamera.data.repository.NoteRepository
 import com.jiahan.smartcamera.data.repository.RemoteConfigRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.domain.NoteCursor
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
@@ -32,14 +32,14 @@ import javax.inject.Inject
 
 sealed interface HomeContent {
     data object Loading : HomeContent
-    data class Success(val notes: List<HomeNote>) : HomeContent
+    data class Success(val notes: List<Note>) : HomeContent
     data class Error(val message: String) : HomeContent
 }
 
 data class HomeUiState(
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
-    val noteToDelete: HomeNote? = null,
+    val noteToDelete: Note? = null,
     val isExploreIconVisible: Boolean = false
 )
 
@@ -116,7 +116,7 @@ class HomeViewModel @Inject constructor(
         )
 
     private var nextCursor: NoteCursor? = null
-    private var hasMoreData = true
+    private var hasMore = true
     private var reloadJob: Job? = null
     private var loadMoreJob: Job? = null
 
@@ -164,17 +164,17 @@ class HomeViewModel @Inject constructor(
     private suspend fun fetchNotes(initialLoading: Boolean) {
         if (initialLoading) {
             nextCursor = null
-            hasMoreData = true
+            hasMore = true
             notesLimit.value = pageSize
         }
-        if (!hasMoreData) return
+        if (!hasMore) return
 
         noteRepository.getNotes(cursor = nextCursor, pageSize = pageSize)
             .onSuccess { notePage ->
                 // The page itself is not used: it has already been mirrored into Room, and
                 // `content` is collecting that. Only the pagination position is ours to keep.
                 nextCursor = notePage.nextCursor
-                hasMoreData = notePage.hasMore
+                hasMore = notePage.hasMore
                 if (!initialLoading) notesLimit.update { it + pageSize }
                 fetchStatus.value = FetchStatus.Settled
             }
@@ -198,7 +198,7 @@ class HomeViewModel @Inject constructor(
 
     fun loadMoreNotes() {
         if (reloadJob?.isActive == true) return
-        if (_uiState.value.isLoadingMore || !hasMoreData) return
+        if (_uiState.value.isLoadingMore || !hasMore) return
 
         loadMoreJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true) }
@@ -217,18 +217,18 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun favoriteNote(homeNote: HomeNote) {
+    fun toggleFavorite(note: Note) {
         viewModelScope.launch {
-            noteRepository.favoriteNote(homeNote)
+            noteRepository.toggleFavorite(note)
                 .onFailure { e -> noteErrorReporter.reportError(e) }
         }
     }
 
-    fun setNoteToDelete(note: HomeNote?) {
+    fun setNoteToDelete(note: Note?) {
         _uiState.update { it.copy(noteToDelete = note) }
     }
 
-    fun shareNote(note: HomeNote) {
+    fun shareNote(note: Note) {
         viewModelScope.launch { noteShare.shareNote(note) }
     }
 }

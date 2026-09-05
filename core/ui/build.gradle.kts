@@ -6,7 +6,7 @@
  * `common/`, so no feature could become its own module while this code sat beside them.
  *
  * The dependency shape is what makes it a sibling of :core:data rather than another layer: nothing
- * here touches a repository, Room or DataStore. It reaches :core:domain for HomeNote, MediaDetail
+ * here touches a repository, Room or DataStore. It reaches :core:domain for Note, MediaDetail
  * and AppConstants, and stops there.
  *
  * Unlike phases 6 and 7 this was not a pure `git mv`. Resources moved for the first time, and with
@@ -14,7 +14,7 @@
  * :app screens that share that vocabulary import it as `UiR` rather than finding it on their own R.
  *
  * One module, not two. Now in Android splits core:designsystem (theme, atoms) from core:ui
- * (composites that know domain types, which NoteItem does -- it takes a HomeNote). At 1,294 lines
+ * (composites that know domain types, which NoteItem does -- it takes a Note). At 1,294 lines
  * nothing consumes one half without the other, so the split would buy nothing here. Revisit if a
  * second app or a Wear/TV surface appears.
  *
@@ -50,7 +50,7 @@ android {
 
 dependencies {
 
-    // api, not implementation: HomeNote and MediaDetail are parameters of NoteItem and
+    // api, not implementation: Note and MediaDetail are parameters of NoteItem and
     // MediaThumbnail, so anything calling them compiles against :core:domain through this edge.
     api(project(":core:domain"))
 

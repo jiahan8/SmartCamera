@@ -8,6 +8,6 @@ data class User(
     val metadata: String,
     val displayName: String,
     val username: String,
-    val profilePicture: String?,
+    val profilePictureUrl: String?,
     val createdDate: Instant,
 )

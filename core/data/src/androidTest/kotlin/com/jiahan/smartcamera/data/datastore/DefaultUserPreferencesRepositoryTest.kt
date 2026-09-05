@@ -55,35 +55,35 @@ class DefaultUserPreferencesRepositoryTest {
 
     @Test
     fun updateDarkThemeVisibility_true_isPersistedAndEmitted() = runBlocking {
-        repository.updateDarkThemeVisibility(true)
+        repository.setDarkTheme(true)
 
-        assertTrue(repository.userPreferencesFlow.first().isDarkTheme)
+        assertTrue(repository.userPreferences.first().isDarkTheme)
     }
 
     @Test
     fun updateDarkThemeVisibility_false_isPersistedAndEmitted() = runBlocking {
-        repository.updateDarkThemeVisibility(true)
-        repository.updateDarkThemeVisibility(false)
+        repository.setDarkTheme(true)
+        repository.setDarkTheme(false)
 
-        assertFalse(repository.userPreferencesFlow.first().isDarkTheme)
+        assertFalse(repository.userPreferences.first().isDarkTheme)
     }
 
     @Test
     fun defaultPreferences_areReturnedWhenNothingPersisted() = runBlocking {
-        val prefs = repository.userPreferencesFlow.first()
+        val prefs = repository.userPreferences.first()
 
         assertFalse(prefs.isDarkTheme)
         assertEquals("", prefs.username)
-        assertNull(prefs.profilePicture)
+        assertNull(prefs.profilePictureUrl)
     }
 
     @Test
     fun updateLocalUserProfile_persistsUsernameAndPicture() = runBlocking {
         repository.updateLocalUserProfile("alice", "https://example.com/alice.png")
 
-        val prefs = repository.userPreferencesFlow.first()
+        val prefs = repository.userPreferences.first()
         assertEquals("alice", prefs.username)
-        assertEquals("https://example.com/alice.png", prefs.profilePicture)
+        assertEquals("https://example.com/alice.png", prefs.profilePictureUrl)
     }
 
     @Test
@@ -91,8 +91,8 @@ class DefaultUserPreferencesRepositoryTest {
         repository.updateLocalUserProfile("bob", "https://example.com/bob.png")
         repository.updateLocalUserProfile("bob", null)
 
-        val prefs = repository.userPreferencesFlow.first()
+        val prefs = repository.userPreferences.first()
         assertEquals("bob", prefs.username)
-        assertNull(prefs.profilePicture)
+        assertNull(prefs.profilePictureUrl)
     }
 }

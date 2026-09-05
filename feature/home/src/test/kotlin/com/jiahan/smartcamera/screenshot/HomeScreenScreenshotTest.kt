@@ -3,7 +3,7 @@ package com.jiahan.smartcamera.screenshot
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.domain.NotePage
 import com.jiahan.smartcamera.fake.FakeErrorHandler
 import com.jiahan.smartcamera.fake.FakeMediaFileRepository
@@ -14,7 +14,7 @@ import com.jiahan.smartcamera.home.HomeScreen
 import com.jiahan.smartcamera.home.HomeViewModel
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import org.junit.Test
 import org.robolectric.RuntimeEnvironment
 import kotlin.time.Instant
@@ -34,14 +34,14 @@ import kotlin.time.Instant
 class HomeScreenScreenshotTest : BaseScreenshotTest() {
 
     private fun captureSettled(content: @Composable () -> Unit) {
-        capture { SmartCameraTheme { content() } }
+        capture { SmartPhotosTheme { content() } }
     }
 
-    private fun note(noteId: String, text: String, favorite: Boolean = false) = HomeNote(
+    private fun note(noteId: String, text: String, isFavorite: Boolean = false) = Note(
         noteId = noteId,
         text = text,
         username = "tester",
-        favorite = favorite,
+        isFavorite = isFavorite,
         createdDate = Instant.fromEpochMilliseconds(1_700_000_000_000L),
     )
 
@@ -74,7 +74,7 @@ class HomeScreenScreenshotTest : BaseScreenshotTest() {
                 onNavigateToVideoPreview = {},
                 onNavigateToExplore = {},
                 viewModel = homeViewModel(Result.success(NotePage(emptyList()))),
-                scrollToTop = null,
+                scrollToTopRequestedAt = null,
                 onScrollToTopConsumed = {},
                 snackbarHostState = remember { SnackbarHostState() },
             )
@@ -85,7 +85,7 @@ class HomeScreenScreenshotTest : BaseScreenshotTest() {
     fun homeScreen_success() {
         val notes = listOf(
             note("doc1", "First note in the feed."),
-            note("doc2", "A second note, marked as a favourite.", favorite = true),
+            note("doc2", "A second note, marked as a favourite.", isFavorite = true),
         )
         captureSettled {
             HomeScreen(
@@ -97,7 +97,7 @@ class HomeScreenScreenshotTest : BaseScreenshotTest() {
                 onNavigateToVideoPreview = {},
                 onNavigateToExplore = {},
                 viewModel = homeViewModel(Result.success(NotePage(notes))),
-                scrollToTop = null,
+                scrollToTopRequestedAt = null,
                 onScrollToTopConsumed = {},
                 snackbarHostState = remember { SnackbarHostState() },
             )
@@ -116,7 +116,7 @@ class HomeScreenScreenshotTest : BaseScreenshotTest() {
                 onNavigateToVideoPreview = {},
                 onNavigateToExplore = {},
                 viewModel = homeViewModel(Result.failure(RuntimeException("Something went wrong"))),
-                scrollToTop = null,
+                scrollToTopRequestedAt = null,
                 onScrollToTopConsumed = {},
                 snackbarHostState = remember { SnackbarHostState() },
             )

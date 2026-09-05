@@ -97,7 +97,7 @@ fun SettingsScreen(
         val status = uiState.status
         if (status is SettingsStatus.Error) {
             snackbarHostState.showAppSnackbar(status.message, isError = true)
-            viewModel.resetActionError()
+            viewModel.dismissError()
         }
     }
 
@@ -113,7 +113,7 @@ fun SettingsScreen(
     when (dialogState) {
         is SettingsDialogState.Logout -> {
             AlertDialog(
-                onDismissRequest = { viewModel.dismissDialog() },
+                onDismissRequest = viewModel::dismissDialog,
                 title = { Text(stringResource(R.string.log_out)) },
                 text = { Text(stringResource(R.string.log_out_desc)) },
                 confirmButton = {
@@ -127,7 +127,7 @@ fun SettingsScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.dismissDialog() }) {
+                    TextButton(onClick = viewModel::dismissDialog) {
                         Text(stringResource(UiR.string.cancel))
                     }
                 }
@@ -142,27 +142,27 @@ fun SettingsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         PasswordField(
                             value = dialogState.currentPassword,
-                            onValueChange = { viewModel.updateCurrentPasswordText(it) },
+                            onValueChange = viewModel::updateCurrentPassword,
                             label = stringResource(R.string.current_password),
-                            visible = dialogState.currentPasswordVisible,
-                            onVisibilityChange = { viewModel.updateCurrentPasswordVisibility(it) },
+                            visible = dialogState.isCurrentPasswordVisible,
+                            onVisibilityChange = viewModel::updateCurrentPasswordVisibility,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         PasswordField(
                             value = dialogState.newPassword,
-                            onValueChange = { viewModel.updateNewPasswordText(it) },
+                            onValueChange = viewModel::updateNewPassword,
                             label = stringResource(R.string.new_password),
-                            visible = dialogState.newPasswordVisible,
-                            onVisibilityChange = { viewModel.updateNewPasswordVisibility(it) },
+                            visible = dialogState.isNewPasswordVisible,
+                            onVisibilityChange = viewModel::updateNewPasswordVisibility,
                             modifier = Modifier.fillMaxWidth(),
                             errorMessage = dialogState.newPasswordErrorMessage,
                         )
                         PasswordField(
                             value = dialogState.confirmNewPassword,
-                            onValueChange = { viewModel.updateConfirmNewPasswordText(it) },
+                            onValueChange = viewModel::updateConfirmNewPassword,
                             label = stringResource(R.string.confirm_new_password),
-                            visible = dialogState.confirmNewPasswordVisible,
-                            onVisibilityChange = { viewModel.updateConfirmNewPasswordVisibility(it) },
+                            visible = dialogState.isConfirmNewPasswordVisible,
+                            onVisibilityChange = viewModel::updateConfirmNewPasswordVisibility,
                             modifier = Modifier.fillMaxWidth(),
                             errorMessage = dialogState.confirmNewPasswordErrorMessage,
                             imeAction = ImeAction.Done,
@@ -174,7 +174,7 @@ fun SettingsScreen(
                 },
                 confirmButton = {
                     TextButton(
-                        onClick = { viewModel.changePassword() },
+                        onClick = viewModel::changePassword,
                         enabled = !isLoading
                     ) {
                         if (isLoading) {
@@ -189,7 +189,7 @@ fun SettingsScreen(
                 },
                 dismissButton = {
                     TextButton(
-                        onClick = { viewModel.dismissDialog() },
+                        onClick = viewModel::dismissDialog,
                         enabled = !isLoading
                     ) {
                         Text(stringResource(UiR.string.cancel))
@@ -200,7 +200,7 @@ fun SettingsScreen(
 
         is SettingsDialogState.DeleteAccount -> {
             AlertDialog(
-                onDismissRequest = { viewModel.dismissDialog() },
+                onDismissRequest = viewModel::dismissDialog,
                 title = { Text(stringResource(R.string.delete_account)) },
                 text = { Text(stringResource(R.string.delete_account_desc)) },
                 confirmButton = {
@@ -214,7 +214,7 @@ fun SettingsScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.dismissDialog() }) {
+                    TextButton(onClick = viewModel::dismissDialog) {
                         Text(stringResource(UiR.string.cancel))
                     }
                 }
@@ -284,7 +284,7 @@ fun SettingsScreen(
                                 checked = isDarkTheme,
                                 onCheckedChange = { newValue ->
                                     hapticFeedback.performHapticFeedback(if (newValue) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
-                                    viewModel.updateDarkThemeVisibility(newValue)
+                                    viewModel.setDarkTheme(newValue)
                                 },
                                 thumbContent = if (isDarkTheme) {
                                     {

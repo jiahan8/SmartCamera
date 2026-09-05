@@ -28,7 +28,7 @@ class DefaultMediaFileRepository @Inject constructor(
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : MediaFileRepository {
 
-    override fun createImageUri(): Uri? = try {
+    override fun createPhotoUri(): Uri? = try {
         val timeStamp = System.currentTimeMillis()
         val imageFile =
             File.createTempFile("$PREFIX_PHOTO$timeStamp", EXTENSION_JPG, context.cacheDir)
@@ -72,7 +72,7 @@ class DefaultMediaFileRepository @Inject constructor(
                     FileOutputStream(file).use { output -> input.copyTo(output) }
                 }
                 getUriForFile(context, FILE_PROVIDER_AUTHORITY, file)
-            }.onFailure { e -> errorHandler.logError(e) }.getOrNull()
+            }.onFailure(errorHandler::logError).getOrNull()
         }
 
     override fun isVideoUri(uri: Uri): Boolean =
@@ -86,7 +86,7 @@ class DefaultMediaFileRepository @Inject constructor(
         false
     }
 
-    override fun deleteUri(uri: Uri) {
+    override fun deleteFile(uri: Uri) {
         try {
             context.contentResolver.delete(uri, null, null)
         } catch (e: Exception) {

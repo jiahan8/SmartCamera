@@ -9,7 +9,7 @@ import com.jiahan.smartcamera.fake.FakeResourceProvider
 import com.jiahan.smartcamera.fake.FakeUserPreferencesRepository
 import com.jiahan.smartcamera.settings.SettingsScreen
 import com.jiahan.smartcamera.settings.SettingsViewModel
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import org.junit.Test
 import org.robolectric.RuntimeEnvironment
 
@@ -37,7 +37,7 @@ class SettingsScreenScreenshotTest : BaseScreenshotTest() {
             errorHandler = FakeErrorHandler(),
         )
         capture {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 SettingsScreen(
                     onBack = {},
                     onNavigateToAuth = {},

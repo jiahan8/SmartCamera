@@ -3,9 +3,7 @@ package com.jiahan.smartcamera.data.repository
 import android.os.Bundle
 import com.google.firebase.analytics.FirebaseAnalytics
 import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
 class FirebaseAnalyticsRepository @Inject constructor(
     private val firebaseAnalytics: FirebaseAnalytics
 ) : AnalyticsRepository {
@@ -30,65 +28,65 @@ class FirebaseAnalyticsRepository @Inject constructor(
         firebaseAnalytics.setUserId(userId)
     }
 
-    override fun logSearchEvent(value: String) {
+    override fun logSearch(query: String) {
         val params = Bundle().apply {
-            putString(FirebaseAnalytics.Param.SEARCH_TERM, value)
+            putString(FirebaseAnalytics.Param.SEARCH_TERM, query)
         }
         firebaseAnalytics.logEvent(FirebaseAnalytics.Event.SEARCH, params)
     }
 
-    override fun logSearchCustomEvent(value: String) {
+    override fun logNoteSearch(query: String) {
         val params = Bundle().apply {
-            putString(SEARCH_TERM_PARAM, value)
+            putString(SEARCH_TERM_PARAM, query)
         }
         firebaseAnalytics.logEvent(NOTE_SEARCH_EVENT, params)
     }
 
-    override fun logNoteCustomEvent(value: String) {
+    override fun logNoteCreate(text: String) {
         val params = Bundle().apply {
-            putString(NOTE_TEXT_PARAM, value)
+            putString(NOTE_TEXT_PARAM, text)
         }
         firebaseAnalytics.logEvent(NOTE_CREATE_EVENT, params)
     }
 
-    override fun logEditNoteCustomEvent(value: String) {
+    override fun logNoteEdit(text: String) {
         val params = Bundle().apply {
-            putString(NOTE_TEXT_PARAM, value)
+            putString(NOTE_TEXT_PARAM, text)
         }
         firebaseAnalytics.logEvent(NOTE_EDIT_EVENT, params)
     }
 
-    override fun logFavoriteSearchCustomEvent(value: String) {
+    override fun logFavoriteSearch(query: String) {
         val params = Bundle().apply {
-            putString(SEARCH_TERM_PARAM, value)
+            putString(SEARCH_TERM_PARAM, query)
         }
         firebaseAnalytics.logEvent(FAVORITE_SEARCH_EVENT, params)
     }
 
-    override fun logExploreSearchCustomEvent(value: String) {
+    override fun logExploreSearch(query: String) {
         val params = Bundle().apply {
-            putString(SEARCH_TERM_PARAM, value)
+            putString(SEARCH_TERM_PARAM, query)
         }
         firebaseAnalytics.logEvent(EXPLORE_SEARCH_EVENT, params)
     }
 
-    override fun logTextCustomEvent(value: String) {
+    override fun logText(text: String) {
         val params = Bundle().apply {
-            putString(TEXT_VALUE_PARAM, value)
+            putString(TEXT_VALUE_PARAM, text)
         }
         firebaseAnalytics.logEvent(TEXT_EVENT, params)
     }
 
-    override fun logDisplayNameCustomEvent(value: String) {
+    override fun logDisplayName(displayName: String) {
         val params = Bundle().apply {
-            putString(DISPLAY_NAME_PARAM, value)
+            putString(DISPLAY_NAME_PARAM, displayName)
         }
         firebaseAnalytics.logEvent(DISPLAY_NAME_EVENT, params)
     }
 
-    override fun logUsernameCustomEvent(value: String) {
+    override fun logUsername(username: String) {
         val params = Bundle().apply {
-            putString(USERNAME_PARAM, value)
+            putString(USERNAME_PARAM, username)
         }
         firebaseAnalytics.logEvent(USERNAME_EVENT, params)
     }

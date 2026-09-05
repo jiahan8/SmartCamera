@@ -12,7 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.jiahan.smartcamera.feature.home.R
 import com.jiahan.smartcamera.core.ui.R as UiR
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.fake.FakeErrorHandler
 import com.jiahan.smartcamera.fake.FakeMediaFileRepository
 import com.jiahan.smartcamera.fake.FakeNoteRepository
@@ -20,7 +20,7 @@ import com.jiahan.smartcamera.fake.FakeRemoteConfigRepository
 import com.jiahan.smartcamera.fake.FakeResourceProvider
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -45,11 +45,11 @@ class HomeScreenTest {
     private val noteRepository = FakeNoteRepository()
     private var navigatedToNotePreview: String? = null
 
-    private fun note(noteId: String, text: String) = HomeNote(
+    private fun note(noteId: String, text: String) = Note(
         noteId = noteId,
         text = text,
         username = "tester",
-        favorite = false,
+        isFavorite = false,
     )
 
     private fun launchHomeScreen() {
@@ -67,7 +67,7 @@ class HomeScreenTest {
             remoteConfigRepository = FakeRemoteConfigRepository(),
         )
         composeTestRule.setContent {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 HomeScreen(
                     title = "SmartPhotos",
                     onNavigateToNotePreview = { navigatedToNotePreview = it },
@@ -76,7 +76,7 @@ class HomeScreenTest {
                     onNavigateToVideoPreview = {},
                     onNavigateToExplore = {},
                     viewModel = viewModel,
-                    scrollToTop = null,
+                    scrollToTopRequestedAt = null,
                     onScrollToTopConsumed = {},
                     snackbarHostState = remember { SnackbarHostState() },
                 )

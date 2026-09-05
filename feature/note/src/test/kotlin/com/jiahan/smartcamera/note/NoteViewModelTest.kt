@@ -10,7 +10,7 @@ import com.jiahan.smartcamera.data.repository.NoteRepository
 import com.jiahan.smartcamera.domain.MediaDetail
 import com.jiahan.smartcamera.domain.MediaUri
 import com.jiahan.smartcamera.domain.NoteMediaDetail
-import com.jiahan.smartcamera.util.AppConstants.MAX_POST_TEXT_LENGTH
+import com.jiahan.smartcamera.util.AppConstants.MAX_NOTE_TEXT_LENGTH
 import com.jiahan.smartcamera.util.ErrorHandler
 import com.jiahan.smartcamera.util.ResourceProvider
 import io.mockk.coEvery
@@ -49,17 +49,17 @@ class NoteViewModelTest {
 
     @Before
     fun setUp() {
-        every { analyticsRepository.logNoteCustomEvent(any()) } just runs
+        every { analyticsRepository.logNoteCreate(any()) } just runs
         every { errorHandler.logError(any()) } just runs
         every { errorHandler.getErrorMessage(any()) } returns "Error"
         every { resourceProvider.getString(any()) } returns "Text too long"
         every { incomingShareHandler.consume() } returns null
-        every { userPreferencesRepository.userPreferencesFlow } returns
+        every { userPreferencesRepository.userPreferences } returns
                 flowOf(
                     UserPreferences(
                         isDarkTheme = false,
                         username = "user1",
-                        profilePicture = null
+                        profilePictureUrl = null
                     )
                 )
         viewModel = NoteViewModel(
@@ -86,56 +86,56 @@ class NoteViewModelTest {
     }
 
     @Test
-    fun `initial postText is empty`() {
-        assertEquals("", viewModel.uiState.value.postText)
+    fun `initial noteText is empty`() {
+        assertEquals("", viewModel.uiState.value.noteText)
     }
 
     @Test
-    fun `initial postButtonEnabled is false`() = runTest {
-        assertFalse(viewModel.postButtonEnabled.value)
+    fun `initial saveButtonEnabled is false`() = runTest {
+        assertFalse(viewModel.saveButtonEnabled.value)
     }
 
     // -------------------------------------------------------------------------
-    // updatePostText
+    // updateNoteText
     // -------------------------------------------------------------------------
 
     @Test
-    fun `updatePostText updates postText state`() {
-        viewModel.updatePostText("Hello world")
-        assertEquals("Hello world", viewModel.uiState.value.postText)
+    fun `updateNoteText updates noteText state`() {
+        viewModel.updateNoteText("Hello world")
+        assertEquals("Hello world", viewModel.uiState.value.noteText)
     }
 
     @Test
-    fun `updatePostText valid text enables post button`() = runTest {
-        viewModel.updatePostText("Hello world")
-        assertTrue(viewModel.postButtonEnabled.value)
+    fun `updateNoteText valid text enables save button`() = runTest {
+        viewModel.updateNoteText("Hello world")
+        assertTrue(viewModel.saveButtonEnabled.value)
     }
 
     @Test
-    fun `updatePostText blank text disables post button`() = runTest {
-        viewModel.updatePostText("Hello")
-        viewModel.updatePostText("   ")
-        assertFalse(viewModel.postButtonEnabled.value)
+    fun `updateNoteText blank text disables save button`() = runTest {
+        viewModel.updateNoteText("Hello")
+        viewModel.updateNoteText("   ")
+        assertFalse(viewModel.saveButtonEnabled.value)
     }
 
     @Test
-    fun `updatePostText exceeding max length sets postTextError`() {
-        val longText = "a".repeat(MAX_POST_TEXT_LENGTH + 1)
-        viewModel.updatePostText(longText)
-        assertEquals("Text too long", viewModel.uiState.value.postTextError)
+    fun `updateNoteText exceeding max length sets noteTextError`() {
+        val longText = "a".repeat(MAX_NOTE_TEXT_LENGTH + 1)
+        viewModel.updateNoteText(longText)
+        assertEquals("Text too long", viewModel.uiState.value.noteTextError)
     }
 
     @Test
-    fun `updatePostText within max length clears postTextError`() {
-        viewModel.updatePostText("a".repeat(MAX_POST_TEXT_LENGTH + 1)) // set error
-        viewModel.updatePostText("short text")                           // clear error
-        assertNull(viewModel.uiState.value.postTextError)
+    fun `updateNoteText within max length clears noteTextError`() {
+        viewModel.updateNoteText("a".repeat(MAX_NOTE_TEXT_LENGTH + 1)) // set error
+        viewModel.updateNoteText("short text")                           // clear error
+        assertNull(viewModel.uiState.value.noteTextError)
     }
 
     @Test
-    fun `updatePostText logs analytics event`() {
-        viewModel.updatePostText("cat photo")
-        verify { analyticsRepository.logNoteCustomEvent("cat photo") }
+    fun `updateNoteText logs analytics event`() {
+        viewModel.updateNoteText("cat photo")
+        verify { analyticsRepository.logNoteCreate("cat photo") }
     }
 
     /**
@@ -147,11 +147,11 @@ class NoteViewModelTest {
         mockk<Uri>().also { every { it.toString() } returns value } to MediaUri(value)
 
     // -------------------------------------------------------------------------
-    // removeUriFromList
+    // removeMediaAt
     // -------------------------------------------------------------------------
 
     @Test
-    fun `removeUriFromList valid index removes item`() = runTest {
+    fun `removeMediaAt valid index removes item`() = runTest {
         val mediaDetails = listOf(
             NoteMediaDetail(
                 photoUri = MediaUri("content://media/1"),
@@ -167,39 +167,39 @@ class NoteViewModelTest {
             )
         )
         coEvery { noteRepository.buildLocalMediaDetails(any()) } returns Result.success(mediaDetails)
-        coEvery { noteRepository.quickUploadMediaToFirebase(any(), any()) } returns Unit
+        coEvery { noteRepository.uploadMediaToCache(any(), any()) } returns Unit
 
-        viewModel.updateUriList(listOf(mockk(), mockk()))
+        viewModel.addMedia(listOf(mockk(), mockk()))
         assertEquals(2, viewModel.uiState.value.mediaList.size)
 
-        viewModel.removeUriFromList(0)
+        viewModel.removeMediaAt(0)
         assertEquals(1, viewModel.uiState.value.mediaList.size)
     }
 
     @Test
-    fun `removeUriFromList out of bounds index does nothing`() = runTest {
-        viewModel.removeUriFromList(99)
+    fun `removeMediaAt out of bounds index does nothing`() = runTest {
+        viewModel.removeMediaAt(99)
         assertEquals(0, viewModel.uiState.value.mediaList.size)
     }
 
     @Test
-    fun `removeUriFromList negative index does nothing`() = runTest {
-        viewModel.removeUriFromList(-1)
+    fun `removeMediaAt negative index does nothing`() = runTest {
+        viewModel.removeMediaAt(-1)
         assertEquals(0, viewModel.uiState.value.mediaList.size)
     }
 
     // -------------------------------------------------------------------------
-    // resetUploadState
+    // resetUploadStatus
     // -------------------------------------------------------------------------
 
     @Test
-    fun `resetUploadState resets to Idle`() = runTest {
-        coEvery { noteRepository.uploadMediaToFirebase(any()) } returns
+    fun `resetUploadStatus resets to Idle`() = runTest {
+        coEvery { noteRepository.uploadMedia(any()) } returns
                 Result.failure(RuntimeException("upload fail"))
-        viewModel.updatePostText("hello")
-        viewModel.uploadPost()
+        viewModel.updateNoteText("hello")
+        viewModel.saveNote()
 
-        viewModel.resetUploadState()
+        viewModel.resetUploadStatus()
         assertTrue(viewModel.uiState.value.uploadStatus is UploadStatus.Idle)
     }
 
@@ -224,35 +224,35 @@ class NoteViewModelTest {
     @Test
     fun `cancelPhotoCapture quick-uploads uri and clears photoUri`() = runTest {
         val (uri, mediaUri) = fakeUri("content://media/photo")
-        coEvery { noteRepository.quickUploadMediaToFirebase(listOf(mediaUri), true) } returns Unit
+        coEvery { noteRepository.uploadMediaToCache(listOf(mediaUri), true) } returns Unit
         viewModel.updatePhotoUri(uri)
         viewModel.cancelPhotoCapture(uri)
-        coVerify { noteRepository.quickUploadMediaToFirebase(listOf(mediaUri), true) }
+        coVerify { noteRepository.uploadMediaToCache(listOf(mediaUri), true) }
         assertNull(viewModel.uiState.value.photoUri)
     }
 
     @Test
     fun `cancelVideoCapture quick-uploads uri and clears videoUri`() = runTest {
         val (uri, mediaUri) = fakeUri("content://media/video")
-        coEvery { noteRepository.quickUploadMediaToFirebase(listOf(mediaUri), true) } returns Unit
+        coEvery { noteRepository.uploadMediaToCache(listOf(mediaUri), true) } returns Unit
         viewModel.updateVideoUri(uri)
         viewModel.cancelVideoCapture(uri)
-        coVerify { noteRepository.quickUploadMediaToFirebase(listOf(mediaUri), true) }
+        coVerify { noteRepository.uploadMediaToCache(listOf(mediaUri), true) }
         assertNull(viewModel.uiState.value.videoUri)
     }
 
     // -------------------------------------------------------------------------
-    // uploadPost
+    // saveNote
     // -------------------------------------------------------------------------
 
     @Test
-    fun `uploadPost success emits Success state`() = runTest {
-        viewModel.updatePostText("My post")
-        coEvery { noteRepository.uploadMediaToFirebase(any()) } returns
+    fun `saveNote success emits Success state`() = runTest {
+        viewModel.updateNoteText("My note")
+        coEvery { noteRepository.uploadMedia(any()) } returns
                 Result.success(listOf(MediaDetail(photoUrl = "http://url")))
         coEvery { noteRepository.addNote(any()) } returns Result.success(Unit)
 
-        viewModel.uploadPost()
+        viewModel.saveNote()
 
         // This used to also await a NoteHandler emission. addNote reads the created note back into
         // the `notes` table now, so the feeds see it as a row -- there is no event to assert.
@@ -261,13 +261,13 @@ class NoteViewModelTest {
     }
 
     @Test
-    fun `uploadPost failure on media upload sets Error state`() = runTest {
-        viewModel.updatePostText("My post")
-        coEvery { noteRepository.uploadMediaToFirebase(any()) } returns
+    fun `saveNote failure on media upload sets Error state`() = runTest {
+        viewModel.updateNoteText("My note")
+        coEvery { noteRepository.uploadMedia(any()) } returns
                 Result.failure(RuntimeException("upload fail"))
         every { errorHandler.getErrorMessage(any()) } returns "upload fail"
 
-        viewModel.uploadPost()
+        viewModel.saveNote()
 
         val state = viewModel.uiState.value.uploadStatus
         assertTrue(state is UploadStatus.Error)

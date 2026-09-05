@@ -3,7 +3,7 @@ package com.jiahan.smartcamera.note
 import android.net.Uri
 import com.jiahan.smartcamera.core.common.R
 import com.jiahan.smartcamera.data.repository.MediaFileRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.util.ResourceProvider
 import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.async
@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import javax.inject.Inject
 
-data class ShareContent(val text: String?, val uris: List<Uri>)
+data class OutgoingShare(val text: String?, val uris: List<Uri>)
 
 /**
  * Sharing a note: download its media to cache files in parallel, then emit what the chooser needs.
@@ -35,10 +35,10 @@ class NoteShareDelegate @Inject constructor(
     private val noteErrorReporter: NoteErrorReporter,
     private val resourceProvider: ResourceProvider
 ) {
-    private val _shareEvent = MutableSharedFlow<ShareContent>(extraBufferCapacity = 1)
+    private val _shareEvent = MutableSharedFlow<OutgoingShare>(extraBufferCapacity = 1)
     val shareEvent = _shareEvent.asSharedFlow()
 
-    suspend fun shareNote(note: HomeNote) {
+    suspend fun shareNote(note: Note) {
         val mediaList = note.mediaList.orEmpty()
         val uris = coroutineScope {
             mediaList
@@ -57,6 +57,6 @@ class NoteShareDelegate @Inject constructor(
             return
         }
 
-        _shareEvent.emit(ShareContent(text = note.text, uris = uris))
+        _shareEvent.emit(OutgoingShare(text = note.text, uris = uris))
     }
 }

@@ -295,12 +295,12 @@ fun NotePreviewScreen(
                                                     hapticFeedback.performHapticFeedback(
                                                         HapticFeedbackType.LongPress
                                                     )
-                                                    viewModel.favoriteNote(note)
+                                                    viewModel.toggleFavorite(note)
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             AnimatedContent(
-                                                targetState = note.favorite,
+                                                targetState = note.isFavorite,
                                                 transitionSpec = {
                                                     (scaleIn(
                                                         animationSpec = spring(

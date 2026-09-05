@@ -79,7 +79,7 @@ fun ProfileScreen(
     val context = LocalContext.current
     val bottomSheetState = rememberModalBottomSheetState()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val showBottomSheet = uiState.showBottomSheet
+    val isBottomSheetVisible = uiState.isBottomSheetVisible
     val scrollState = rememberScrollState()
 
     val email = uiState.email
@@ -131,16 +131,16 @@ fun ProfileScreen(
     ) { isGranted ->
         hasCameraPermission = isGranted
         if (isGranted) {
-            val uri = viewModel.createImageUri()
+            val uri = viewModel.createPhotoUri()
             viewModel.updatePhotoUri(uri)
             uri?.let { pictureLauncher.launch(it) }
         }
     }
 
     LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
+        viewModel.profileEvent.collect { event ->
             when (event) {
-                ProfileEvent.UpdateSuccess, ProfileEvent.UploadSuccess -> {
+                ProfileEvent.UpdateSuccess, ProfileEvent.PictureChanged -> {
                     snackbarHostState.showAppSnackbar(updateSuccessMessage)
                 }
 
@@ -154,9 +154,9 @@ fun ProfileScreen(
         }
     }
 
-    if (showBottomSheet) {
+    if (isBottomSheetVisible) {
         ModalBottomSheet(
-            onDismissRequest = { viewModel.updateBottomSheetVisibility(false) },
+            onDismissRequest = viewModel::dismissBottomSheet,
             sheetState = bottomSheetState
         ) {
             Column(modifier = Modifier.wrapContentHeight()) {
@@ -176,7 +176,7 @@ fun ProfileScreen(
                     label = stringResource(R.string.take_photo),
                     onClick = {
                         if (hasCameraPermission) {
-                            val uri = viewModel.createImageUri()
+                            val uri = viewModel.createPhotoUri()
                             viewModel.updatePhotoUri(uri)
                             uri?.let { pictureLauncher.launch(it) }
                         } else {
@@ -188,7 +188,7 @@ fun ProfileScreen(
                     BottomSheetActionItem(
                         icon = Icons.Rounded.Delete,
                         label = stringResource(R.string.remove_current_picture),
-                        onClick = { viewModel.showDeletePictureDialog() },
+                        onClick = viewModel::showDeletePictureDialog,
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -199,7 +199,7 @@ fun ProfileScreen(
     when (dialogState) {
         is ProfileDialogState.DeletePicture -> {
             AlertDialog(
-                onDismissRequest = { viewModel.dismissDialog() },
+                onDismissRequest = viewModel::dismissDialog,
                 title = { Text(stringResource(R.string.delete_picture)) },
                 text = { Text(stringResource(R.string.delete_picture_desc)) },
                 confirmButton = {
@@ -213,7 +213,7 @@ fun ProfileScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.dismissDialog() }) {
+                    TextButton(onClick = viewModel::dismissDialog) {
                         Text(stringResource(UiR.string.cancel))
                     }
                 }
@@ -264,7 +264,7 @@ fun ProfileScreen(
                     )
 
                     TextButton(
-                        onClick = { viewModel.updateBottomSheetVisibility(true) }
+                        onClick = viewModel::showBottomSheet
                     ) {
                         Text(text = stringResource(R.string.edit_picture))
                     }
@@ -290,7 +290,7 @@ fun ProfileScreen(
 
                         OutlinedTextField(
                             value = displayName,
-                            onValueChange = { viewModel.updateDisplayNameText(it) },
+                            onValueChange = viewModel::updateDisplayName,
                             label = { Text(stringResource(CommonR.string.name)) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.large,
@@ -298,7 +298,7 @@ fun ProfileScreen(
                             leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
                             trailingIcon = {
                                 if (displayName.isNotEmpty()) {
-                                    IconButton(onClick = { viewModel.updateDisplayNameText("") }) {
+                                    IconButton(onClick = { viewModel.updateDisplayName("") }) {
                                         Icon(
                                             imageVector = Icons.Rounded.Clear,
                                             contentDescription = stringResource(UiR.string.cd_clear_field),
@@ -321,7 +321,7 @@ fun ProfileScreen(
 
                         OutlinedTextField(
                             value = username,
-                            onValueChange = { viewModel.updateUsernameText(it) },
+                            onValueChange = viewModel::updateUsername,
                             label = { Text(stringResource(CommonR.string.username)) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.large,
@@ -331,7 +331,7 @@ fun ProfileScreen(
                             },
                             trailingIcon = {
                                 if (username.isNotEmpty()) {
-                                    IconButton(onClick = { viewModel.updateUsernameText("") }) {
+                                    IconButton(onClick = { viewModel.updateUsername("") }) {
                                         Icon(
                                             imageVector = Icons.Rounded.Clear,
                                             contentDescription = stringResource(UiR.string.cd_clear_field),
@@ -369,7 +369,7 @@ fun ProfileScreen(
                                 .fillMaxWidth()
                                 .height(52.dp)
                                 .bounceScale(saveInteractionSource),
-                            onClick = { viewModel.updateUserProfile() },
+                            onClick = viewModel::updateUserProfile,
                             interactionSource = saveInteractionSource,
                             enabled = isFormChanged && isErrorFree && !isSaving
                         ) {

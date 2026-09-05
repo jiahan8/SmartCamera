@@ -10,7 +10,7 @@ import com.jiahan.smartcamera.data.repository.MediaFileRepository
  */
 class FakeMediaFileRepository : MediaFileRepository {
 
-    override fun createImageUri(): Uri? = null
+    override fun createPhotoUri(): Uri? = null
 
     override fun createVideoUri(): Uri? = null
 
@@ -22,5 +22,5 @@ class FakeMediaFileRepository : MediaFileRepository {
 
     override fun hasContent(uri: Uri): Boolean = true
 
-    override fun deleteUri(uri: Uri) {}
+    override fun deleteFile(uri: Uri) {}
 }

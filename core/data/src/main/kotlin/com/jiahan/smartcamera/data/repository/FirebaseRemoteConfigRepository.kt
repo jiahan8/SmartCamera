@@ -16,9 +16,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
 class FirebaseRemoteConfigRepository @Inject constructor(
     private val remoteConfig: FirebaseRemoteConfig,
     private val errorHandler: ErrorHandler,

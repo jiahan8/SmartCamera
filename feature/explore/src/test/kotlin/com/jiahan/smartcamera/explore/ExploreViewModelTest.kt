@@ -51,7 +51,7 @@ class ExploreViewModelTest {
     fun setUp() {
         every { errorHandler.logError(any(), any()) } just runs
         every { errorHandler.getErrorMessage(any()) } returns "An error occurred"
-        every { analyticsRepository.logExploreSearchCustomEvent(any()) } just runs
+        every { analyticsRepository.logExploreSearch(any()) } just runs
         coEvery { photoRepository.listPhotos(any(), any()) } returns
                 Result.success(PhotoPage(emptyList(), hasMore = false))
         viewModel = ExploreViewModel(photoRepository, analyticsRepository, errorHandler)
@@ -66,8 +66,8 @@ class ExploreViewModelTest {
 
     private fun makePhoto(id: String) = Photo(
         id = id,
-        imageUrl = "https://example.com/$id.jpg",
-        thumbUrl = "https://example.com/$id-thumb.jpg",
+        photoUrl = "https://example.com/$id.jpg",
+        thumbnailUrl = "https://example.com/$id-thumb.jpg",
         width = 100,
         height = 100,
         username = "testUser"
@@ -185,7 +185,7 @@ class ExploreViewModelTest {
         // Reset recorded calls (keep stubs) so we measure only what loadMorePhotos triggers
         clearMocks(photoRepository, answers = false)
 
-        vm.loadMorePhotos() // hasMoreData = false → should be a no-op
+        vm.loadMorePhotos() // hasMore = false → should be a no-op
 
         coVerify(exactly = 0) { photoRepository.listPhotos(any(), any()) }
     }
@@ -496,7 +496,7 @@ class ExploreViewModelTest {
             // triggers
             clearMocks(photoRepository, answers = false)
 
-            viewModel.loadMoreSearchResults() // searchHasMoreData = false → should be a no-op
+            viewModel.loadMoreSearchResults() // searchHasMore = false → should be a no-op
 
             coVerify(exactly = 0) { photoRepository.searchPhotos(any(), any(), any()) }
         }

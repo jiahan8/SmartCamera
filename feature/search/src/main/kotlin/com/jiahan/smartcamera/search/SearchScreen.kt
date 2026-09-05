@@ -47,10 +47,10 @@ fun SearchScreen(
     onNavigateToEditNote: (noteId: String) -> Unit,
     onNavigateToPhotoPreview: (url: String) -> Unit,
     onNavigateToVideoPreview: (url: String) -> Unit,
-    scrollToTop: Long?,
+    scrollToTopRequestedAt: Long?,
     onScrollToTopConsumed: () -> Unit,
     snackbarHostState: SnackbarHostState,
-    onScrollDirectionChanged: (Boolean) -> Unit = {},
+    onScrollDirectionChanged: (isScrollingUp: Boolean) -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -73,6 +73,13 @@ fun SearchScreen(
 
     ScrollDirectionEffect(listState, onScrollDirectionChanged)
 
+    ScrollToTopEffect(
+        scrollToTopRequestedAt = scrollToTopRequestedAt,
+        listState = listState,
+        hasItems = (content as? SearchContent.Success)?.notes?.isNotEmpty() == true,
+        onConsumed = onScrollToTopConsumed
+    )
+
     LaunchedEffect(Unit) {
         viewModel.actionError.collect { message ->
             snackbarHostState.showAppSnackbar(message, isError = true)
@@ -88,13 +95,6 @@ fun SearchScreen(
             intentBuilder.startChooser()
         }
     }
-
-    ScrollToTopEffect(
-        scrollToTop = scrollToTop,
-        listState = listState,
-        hasItems = (content as? SearchContent.Success)?.notes?.isNotEmpty() == true,
-        onConsumed = onScrollToTopConsumed
-    )
 
     uiState.noteToDelete?.let { note ->
         DeleteNoteConfirmationDialog(
@@ -150,7 +150,7 @@ fun SearchScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     state = pullToRefreshState,
                                     isRefreshing = uiState.isRefreshing,
-                                    onRefresh = { viewModel.refresh() },
+                                    onRefresh = viewModel::refresh,
                                 ) {
                                     LazyColumn(
                                         state = listState,
@@ -168,7 +168,7 @@ fun SearchScreen(
                                                     onNavigateToNotePreview(note.noteId)
                                                 },
                                                 onEditNote = { onNavigateToEditNote(note.noteId) },
-                                                onFavoriteNote = { viewModel.favoriteNote(note) },
+                                                onToggleFavorite = { viewModel.toggleFavorite(note) },
                                                 onDeleteNote = { viewModel.setNoteToDelete(note) },
                                                 onPhotoClick = { url ->
                                                     onNavigateToPhotoPreview(url)

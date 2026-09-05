@@ -37,8 +37,8 @@ import kotlin.time.Clock
 data class MainUiState(
     val isAppReady: Boolean = false,
     val startDestination: Any = AuthRoute,
-    val showBottomBar: Boolean = true,
-    val scrollToTop: Long? = null,
+    val isBottomBarVisible: Boolean = true,
+    val scrollToTopRequestedAt: Long? = null,
     val pendingNoteId: String? = null
 )
 
@@ -70,7 +70,7 @@ class MainViewModel @Inject constructor(
             initialValue = AppUpdateState.NotAvailable
         )
 
-    val isDarkTheme = userPreferencesRepository.userPreferencesFlow
+    val isDarkTheme = userPreferencesRepository.userPreferences
         .map { it.isDarkTheme }
         .stateIn(
             scope = viewModelScope,
@@ -89,7 +89,7 @@ class MainViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             remoteConfigRepository.fetchAndActivateConfig()
-                .onFailure { e -> errorHandler.logError(e) }
+                .onFailure(errorHandler::logError)
             val destination =
                 if (authRepository.currentUserId != null && authRepository.isCurrentUserEmailVerified)
                     HomeRoute
@@ -99,16 +99,16 @@ class MainViewModel @Inject constructor(
             if (destination == HomeRoute) {
                 analyticsRepository.setUserId(authRepository.currentUserId)
                 userRepository.registerForPushNotifications()
-                    .onFailure { e -> errorHandler.logError(e) }
+                    .onFailure(errorHandler::logError)
                 val today = clock.todayIn(TimeZone.currentSystemDefault())
                 userRepository.recordUserActivity(today)
-                    .onFailure { e -> errorHandler.logError(e) }
+                    .onFailure(errorHandler::logError)
             }
         }
     }
 
-    fun updateBottomBarVisibility(showBottomBar: Boolean) {
-        _uiState.update { it.copy(showBottomBar = showBottomBar) }
+    fun updateBottomBarVisibility(visible: Boolean) {
+        _uiState.update { it.copy(isBottomBarVisible = visible) }
     }
 
     fun updateStartDestination(destination: Any) {
@@ -116,11 +116,11 @@ class MainViewModel @Inject constructor(
     }
 
     fun triggerScrollToTop() {
-        _uiState.update { it.copy(scrollToTop = System.currentTimeMillis()) }
+        _uiState.update { it.copy(scrollToTopRequestedAt = System.currentTimeMillis()) }
     }
 
     fun consumeScrollToTopEvent() {
-        _uiState.update { it.copy(scrollToTop = null) }
+        _uiState.update { it.copy(scrollToTopRequestedAt = null) }
     }
 
     fun handleIncomingIntent(intent: Intent) {
@@ -150,7 +150,7 @@ class MainViewModel @Inject constructor(
         share?.let(incomingShareHandler::postShare)
     }
 
-    fun onNotificationNoteIdReceived(noteId: String) {
+    fun openNoteFromNotification(noteId: String) {
         _uiState.update { it.copy(pendingNoteId = noteId) }
     }
 
@@ -169,7 +169,7 @@ class MainViewModel @Inject constructor(
     fun completeUpdate() {
         viewModelScope.launch {
             appUpdateRepository.completeUpdate()
-                .onFailure { e -> errorHandler.logError(e) }
+                .onFailure(errorHandler::logError)
         }
     }
 }

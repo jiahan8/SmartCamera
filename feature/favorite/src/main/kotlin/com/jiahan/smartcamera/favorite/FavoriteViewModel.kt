@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jiahan.smartcamera.data.repository.AnalyticsRepository
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.util.AppConstants.DEBOUNCE_MS
@@ -33,14 +33,14 @@ import kotlin.time.Duration.Companion.milliseconds
 
 sealed interface FavoriteContent {
     data object Loading : FavoriteContent
-    data class Success(val notes: List<HomeNote>) : FavoriteContent
+    data class Success(val notes: List<Note>) : FavoriteContent
     data class Error(val message: String) : FavoriteContent
 }
 
 data class FavoriteUiState(
     val searchQuery: String = "",
     val isRefreshing: Boolean = false,
-    val noteToDelete: HomeNote? = null
+    val noteToDelete: Note? = null
 )
 
 /**
@@ -121,7 +121,7 @@ class FavoriteViewModel @Inject constructor(
         viewModelScope.launch {
             debouncedQuery.collect { query ->
                 if (query.isNotBlank()) {
-                    analyticsRepository.logFavoriteSearchCustomEvent(query)
+                    analyticsRepository.logFavoriteSearch(query)
                 }
             }
         }
@@ -172,18 +172,18 @@ class FavoriteViewModel @Inject constructor(
         }
     }
 
-    fun favoriteNote(homeNote: HomeNote) {
+    fun toggleFavorite(note: Note) {
         viewModelScope.launch {
-            noteRepository.favoriteNote(homeNote)
+            noteRepository.toggleFavorite(note)
                 .onFailure { e -> noteErrorReporter.reportError(e) }
         }
     }
 
-    fun setNoteToDelete(note: HomeNote?) {
+    fun setNoteToDelete(note: Note?) {
         _uiState.update { it.copy(noteToDelete = note) }
     }
 
-    fun shareNote(note: HomeNote) {
+    fun shareNote(note: Note) {
         viewModelScope.launch { noteShare.shareNote(note) }
     }
 }

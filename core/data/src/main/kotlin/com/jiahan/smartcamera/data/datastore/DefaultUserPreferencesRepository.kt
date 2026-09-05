@@ -28,20 +28,20 @@ private object PreferencesKeys {
 class DefaultUserPreferencesRepository @Inject constructor(
     private val dataStore: DataStore<Preferences>,
 ) : UserPreferencesRepository {
-    override val userPreferencesFlow: Flow<UserPreferences> = dataStore.data
+    override val userPreferences: Flow<UserPreferences> = dataStore.data
         .catch { exception ->
             if (exception is IOException) emit(emptyPreferences()) else throw exception
         }.map { preferences ->
             UserPreferences(
                 isDarkTheme = preferences[PreferencesKeys.IS_DARK_THEME] == true,
                 username = preferences[PreferencesKeys.USERNAME] ?: "",
-                profilePicture = preferences[PreferencesKeys.PROFILE_PICTURE]
+                profilePictureUrl = preferences[PreferencesKeys.PROFILE_PICTURE]
             )
         }
 
-    override suspend fun updateDarkThemeVisibility(isDarkTheme: Boolean): Result<Unit> = safeCall {
+    override suspend fun setDarkTheme(enabled: Boolean): Result<Unit> = safeCall {
         dataStore.edit { preferences ->
-            preferences[PreferencesKeys.IS_DARK_THEME] = isDarkTheme
+            preferences[PreferencesKeys.IS_DARK_THEME] = enabled
         }
     }
 

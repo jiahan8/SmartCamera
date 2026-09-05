@@ -58,7 +58,7 @@ class DefaultAuthRepository @Inject constructor(
 
     override suspend fun signOut(): Result<Unit> = safeCall {
         userRepository.unregisterFromPushNotifications()
-            .onFailure { e -> errorHandler.logError(e) }
+            .onFailure(errorHandler::logError)
         auth.signOut()
         noteDao.clearAllNotes()
     }

@@ -43,11 +43,11 @@ class ScrollToTopEffectTest {
     private var consumedCount = 0
     private lateinit var listState: LazyListState
 
-    private fun setContent(scrollToTop: () -> Long?, hasItems: () -> Boolean) {
+    private fun setContent(scrollToTopRequestedAt: () -> Long?, hasItems: () -> Boolean) {
         composeRule.setContent {
             listState = rememberLazyListState()
             ScrollToTopEffect(
-                scrollToTop = scrollToTop(),
+                scrollToTopRequestedAt = scrollToTopRequestedAt(),
                 listState = listState,
                 hasItems = hasItems(),
                 onConsumed = { consumedCount++ }
@@ -68,13 +68,13 @@ class ScrollToTopEffectTest {
 
     /**
      * The regression this pins: a tab re-tap can land before the feed has rows, and `hasItems` is
-     * read inside the effect. Keyed on `scrollToTop` alone the request was dropped for good --
+     * read inside the effect. Keyed on `scrollToTopRequestedAt` alone the request was dropped for good --
      * `consumedCount` stayed 0 here and the list never returned to the top.
      */
     @Test
     fun `runs a scroll requested before the list had items, once they arrive`() {
         var hasItems by mutableStateOf(false)
-        setContent(scrollToTop = { 1L }) { hasItems }
+        setContent(scrollToTopRequestedAt = { 1L }) { hasItems }
         scrollAwayFromTop()
 
         assertEquals(0, consumedCount)
@@ -88,12 +88,12 @@ class ScrollToTopEffectTest {
 
     @Test
     fun `scrolls to the top and consumes when items are already present`() {
-        var scrollToTop by mutableStateOf<Long?>(null)
-        setContent(scrollToTop = { scrollToTop }) { true }
+        var scrollToTopRequestedAt by mutableStateOf<Long?>(null)
+        setContent(scrollToTopRequestedAt = { scrollToTopRequestedAt }) { true }
         scrollAwayFromTop()
 
         // The tab re-tap: MainViewModel stamps a timestamp, which is what the effect keys on.
-        scrollToTop = 1L
+        scrollToTopRequestedAt = 1L
         composeRule.waitForIdle()
 
         assertEquals(1, consumedCount)
@@ -103,7 +103,7 @@ class ScrollToTopEffectTest {
     @Test
     fun `does nothing while no scroll is pending`() {
         var hasItems by mutableStateOf(false)
-        setContent(scrollToTop = { null }) { hasItems }
+        setContent(scrollToTopRequestedAt = { null }) { hasItems }
         scrollAwayFromTop()
 
         hasItems = true

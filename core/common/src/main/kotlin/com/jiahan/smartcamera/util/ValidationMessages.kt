@@ -7,7 +7,7 @@ import com.jiahan.smartcamera.core.common.R
  *
  * The presentation half of the split ValidationError describes: the validators in :core:domain
  * name the rule that failed, this resolves the copy, and a ViewModel renders it as
- * `resourceProvider.getString(validationErrorMessageResId(result.error))`.
+ * `resourceProvider.getString(validationErrorMessageResId(result.reason))`.
  *
  * **It lives here rather than in :app's ErrorMessageMappers.kt, which is where AGENTS.md sends a
  * new mapper, and the exception is worth understanding.** An AppError reaches a feature as a

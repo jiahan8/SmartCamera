@@ -32,7 +32,7 @@ import javax.inject.Inject
 
 sealed interface ProfileEvent {
     data object UpdateSuccess : ProfileEvent
-    data object UploadSuccess : ProfileEvent
+    data object PictureChanged : ProfileEvent
     data class UpdateError(val message: String? = null) : ProfileEvent
 }
 
@@ -55,7 +55,7 @@ data class ProfileUiState(
     val isLoading: Boolean = false,
     val isUploading: Boolean = false,
     val dialogState: ProfileDialogState = ProfileDialogState.None,
-    val showBottomSheet: Boolean = false
+    val isBottomSheetVisible: Boolean = false
 )
 
 @HiltViewModel
@@ -74,8 +74,8 @@ class ProfileViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState = _uiState.asStateFlow()
-    private val _events = MutableSharedFlow<ProfileEvent>(extraBufferCapacity = 1)
-    val events = _events.asSharedFlow()
+    private val _profileEvent = MutableSharedFlow<ProfileEvent>(extraBufferCapacity = 1)
+    val profileEvent = _profileEvent.asSharedFlow()
 
     init {
         loadUserProfile()
@@ -95,12 +95,12 @@ class ProfileViewModel @Inject constructor(
                             email = fetchedUser?.email ?: "",
                             displayName = fetchedUser?.displayName ?: "",
                             username = fetchedUser?.username ?: "",
-                            profilePictureUrl = fetchedUser?.profilePicture
+                            profilePictureUrl = fetchedUser?.profilePictureUrl
                         )
                     }
                     userPreferencesRepository.updateLocalUserProfile(
                         username = fetchedUser?.username ?: "",
-                        profilePictureUrl = fetchedUser?.profilePicture
+                        profilePictureUrl = fetchedUser?.profilePictureUrl
                     )
                 }
                 .onFailure { e ->
@@ -110,11 +110,11 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun updateDisplayNameText(text: String) {
+    fun updateDisplayName(text: String) {
         val displayNameErrorMessage =
             when (val validationResult = validateDisplayName(text.trim(), requireNonBlank = true)) {
                 is ValidationResult.Error ->
-                    resourceProvider.getString(validationErrorMessageResId(validationResult.error))
+                    resourceProvider.getString(validationErrorMessageResId(validationResult.reason))
 
                 else -> null
             }
@@ -124,24 +124,24 @@ class ProfileViewModel @Inject constructor(
                 displayNameErrorMessage = displayNameErrorMessage
             )
         }
-        checkFormChanges()
-        analyticsRepository.logDisplayNameCustomEvent(text)
+        recomputeFormState()
+        analyticsRepository.logDisplayName(text)
     }
 
-    fun updateUsernameText(text: String) {
+    fun updateUsername(text: String) {
         val usernameErrorMessage =
             when (val validationResult = validateUsername(text.trim(), requireNonBlank = true)) {
                 is ValidationResult.Error ->
-                    resourceProvider.getString(validationErrorMessageResId(validationResult.error))
+                    resourceProvider.getString(validationErrorMessageResId(validationResult.reason))
 
                 else -> null
             }
         _uiState.update { it.copy(username = text, usernameErrorMessage = usernameErrorMessage) }
-        checkFormChanges()
-        analyticsRepository.logUsernameCustomEvent(text)
+        recomputeFormState()
+        analyticsRepository.logUsername(text)
     }
 
-    private fun checkFormChanges() {
+    private fun recomputeFormState() {
         _uiState.update {
             val isFormChanged = it.displayName.trim() != user?.displayName ||
                     it.username.trim() != user?.username
@@ -182,7 +182,7 @@ class ProfileViewModel @Inject constructor(
                                 isLoading = false
                             )
                         }
-                        _events.tryEmit(ProfileEvent.UpdateError())
+                        _profileEvent.tryEmit(ProfileEvent.UpdateError())
                         return@launch
                     }
                 if (!available) {
@@ -209,7 +209,7 @@ class ProfileViewModel @Inject constructor(
             ).onSuccess {
                 loadUserProfile()
                 _uiState.update { it.copy(isFormChanged = false) }
-                _events.tryEmit(ProfileEvent.UpdateSuccess)
+                _profileEvent.tryEmit(ProfileEvent.UpdateSuccess)
             }.onFailure { e ->
                 errorHandler.logError(e)
                 // A username conflict belongs inline under the username field, anything else in
@@ -230,7 +230,7 @@ class ProfileViewModel @Inject constructor(
                             else null
                     )
                 }
-                _events.tryEmit(ProfileEvent.UpdateError())
+                _profileEvent.tryEmit(ProfileEvent.UpdateError())
             }
             _uiState.update { it.copy(isLoading = false) }
         }
@@ -239,15 +239,15 @@ class ProfileViewModel @Inject constructor(
     fun uploadProfilePicture(profilePictureUri: Uri) {
         val mediaUri = profilePictureUri.toMediaUri()
         viewModelScope.launch {
-            noteRepository.quickUploadMediaToFirebase(listOf(mediaUri))
+            noteRepository.uploadMediaToCache(listOf(mediaUri))
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isUploading = true, showBottomSheet = false) }
+            _uiState.update { it.copy(isUploading = true, isBottomSheetVisible = false) }
             userRepository.uploadProfilePicture(mediaUri)
                 .onSuccess { profilePictureUrl ->
                     if (profilePictureUrl == null) {
-                        _events.tryEmit(ProfileEvent.UpdateError())
+                        _profileEvent.tryEmit(ProfileEvent.UpdateError())
                         _uiState.update { it.copy(isUploading = false) }
                         return@launch
                     }
@@ -260,15 +260,15 @@ class ProfileViewModel @Inject constructor(
                         )
                     ).onSuccess {
                         loadUserProfile()
-                        _events.tryEmit(ProfileEvent.UploadSuccess)
+                        _profileEvent.tryEmit(ProfileEvent.PictureChanged)
                     }.onFailure { e ->
                         errorHandler.logError(e)
-                        _events.tryEmit(ProfileEvent.UpdateError(errorHandler.getErrorMessage(e)))
+                        _profileEvent.tryEmit(ProfileEvent.UpdateError(errorHandler.getErrorMessage(e)))
                     }
                 }
                 .onFailure { e ->
                     errorHandler.logError(e)
-                    _events.tryEmit(ProfileEvent.UpdateError(errorHandler.getErrorMessage(e)))
+                    _profileEvent.tryEmit(ProfileEvent.UpdateError(errorHandler.getErrorMessage(e)))
                 }
             _uiState.update { it.copy(isUploading = false) }
         }
@@ -276,23 +276,23 @@ class ProfileViewModel @Inject constructor(
 
     fun deleteProfilePicture() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isUploading = true, showBottomSheet = false) }
+            _uiState.update { it.copy(isUploading = true, isBottomSheetVisible = false) }
             userRepository.updateUserProfile(
                 displayName = null,
                 username = null,
                 profilePicture = ProfilePictureUpdate.Delete
             ).onSuccess {
                 loadUserProfile()
-                _events.tryEmit(ProfileEvent.UploadSuccess)
+                _profileEvent.tryEmit(ProfileEvent.PictureChanged)
             }.onFailure { e ->
                 errorHandler.logError(e)
-                _events.tryEmit(ProfileEvent.UpdateError(errorHandler.getErrorMessage(e)))
+                _profileEvent.tryEmit(ProfileEvent.UpdateError(errorHandler.getErrorMessage(e)))
             }
             _uiState.update { it.copy(isUploading = false) }
         }
     }
 
-    fun createImageUri(): Uri? = mediaFileRepository.createImageUri()
+    fun createPhotoUri(): Uri? = mediaFileRepository.createPhotoUri()
 
     fun updatePhotoUri(uri: Uri?) {
         _uiState.update { it.copy(photoUri = uri) }
@@ -300,7 +300,7 @@ class ProfileViewModel @Inject constructor(
 
     fun cancelPhotoCapture(uri: Uri) {
         viewModelScope.launch {
-            noteRepository.quickUploadMediaToFirebase(
+            noteRepository.uploadMediaToCache(
                 listOf(uri.toMediaUri()),
                 deleteAfterUpload = true
             )
@@ -316,7 +316,11 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(dialogState = ProfileDialogState.None) }
     }
 
-    fun updateBottomSheetVisibility(showBottomSheet: Boolean) {
-        _uiState.update { it.copy(showBottomSheet = showBottomSheet) }
+    fun showBottomSheet() {
+        _uiState.update { it.copy(isBottomSheetVisible = true) }
+    }
+
+    fun dismissBottomSheet() {
+        _uiState.update { it.copy(isBottomSheetVisible = false) }
     }
 }

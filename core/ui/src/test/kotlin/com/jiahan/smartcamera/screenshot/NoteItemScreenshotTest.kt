@@ -2,9 +2,9 @@ package com.jiahan.smartcamera.screenshot
 
 import com.jiahan.smartcamera.common.NoteItem
 import com.jiahan.smartcamera.domain.DetectedLabel
-import com.jiahan.smartcamera.domain.HomeNote
 import com.jiahan.smartcamera.domain.MediaDetail
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.domain.Note
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import org.junit.Test
 import kotlin.time.Instant
 
@@ -21,7 +21,7 @@ class NoteItemScreenshotTest : BaseScreenshotTest() {
     @Test
     fun noteItem_textOnly_light() {
         capture {
-            SmartCameraTheme(darkTheme = false) {
+            SmartPhotosTheme(darkTheme = false) {
                 NoteItem(
                     sampleNote,
                     {},
@@ -39,7 +39,7 @@ class NoteItemScreenshotTest : BaseScreenshotTest() {
     @Test
     fun noteItem_textOnly_dark() {
         capture {
-            SmartCameraTheme(darkTheme = true) {
+            SmartPhotosTheme(darkTheme = true) {
                 NoteItem(
                     sampleNote,
                     {},
@@ -57,7 +57,7 @@ class NoteItemScreenshotTest : BaseScreenshotTest() {
     @Test
     fun noteItem_favorited_light() {
         capture {
-            SmartCameraTheme(darkTheme = false) {
+            SmartPhotosTheme(darkTheme = false) {
                 NoteItem(
                     favoritedNote,
                     {},
@@ -75,7 +75,7 @@ class NoteItemScreenshotTest : BaseScreenshotTest() {
     @Test
     fun noteItem_withMediaThumbnail_light() {
         capture {
-            SmartCameraTheme(darkTheme = false) {
+            SmartPhotosTheme(darkTheme = false) {
                 NoteItem(
                     noteWithMedia,
                     {},
@@ -91,13 +91,13 @@ class NoteItemScreenshotTest : BaseScreenshotTest() {
     }
 
     private companion object {
-        val sampleNote = HomeNote(
+        val sampleNote = Note(
             noteId = "note1",
             username = "john_doe",
             text = "Hello, this is a preview note with some sample text that wraps across multiple lines.",
             mediaList = null,
             profilePictureUrl = null,
-            favorite = false,
+            isFavorite = false,
             createdDate = Instant.fromEpochMilliseconds(1_700_000_000_000L),
         )
 
@@ -105,7 +105,7 @@ class NoteItemScreenshotTest : BaseScreenshotTest() {
             noteId = "note2",
             username = "jane_doe",
             text = "This note is marked as a favourite.",
-            favorite = true,
+            isFavorite = true,
         )
 
         val noteWithMedia = sampleNote.copy(
@@ -114,7 +114,7 @@ class NoteItemScreenshotTest : BaseScreenshotTest() {
             mediaList = listOf(
                 MediaDetail(
                     photoUrl = "",
-                    generatedText = listOf("a cat on a sofa"),
+                    generatedTexts = listOf("a cat on a sofa"),
                     generatedLabels = listOf(DetectedLabel("Cat", 0.98)),
                 )
             ),

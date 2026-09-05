@@ -45,14 +45,14 @@ class NoteDaoTest {
 
     private fun note(
         noteId: String,
-        favorite: Boolean = true,
+        isFavorite: Boolean = true,
         createdDate: Long? = 0L,
         mediaList: List<MediaDetail>? = null,
     ) = DatabaseNote(
         noteId = noteId,
         text = "Note $noteId",
         createdDate = createdDate,
-        favorite = favorite,
+        isFavorite = isFavorite,
         mediaList = mediaList,
         username = "tester",
         profilePictureUrl = null,
@@ -68,8 +68,8 @@ class NoteDaoTest {
     fun getNotes_returnsEveryNoteRegardlessOfFavoriteFlag() = runBlocking {
         noteDao.upsertNotes(
             listOf(
-                note("fav", favorite = true),
-                note("notFav", favorite = false),
+                note("fav", isFavorite = true),
+                note("notFav", isFavorite = false),
             )
         )
 
@@ -83,9 +83,9 @@ class NoteDaoTest {
     fun getNotes_areOrderedByCreatedDateDescending() = runBlocking {
         noteDao.upsertNotes(
             listOf(
-                note("old", favorite = false, createdDate = 100L),
-                note("newest", favorite = false, createdDate = 300L),
-                note("middle", favorite = true, createdDate = 200L),
+                note("old", isFavorite = false, createdDate = 100L),
+                note("newest", isFavorite = false, createdDate = 300L),
+                note("middle", isFavorite = true, createdDate = 200L),
             )
         )
 
@@ -99,12 +99,12 @@ class NoteDaoTest {
 
     @Test
     fun getNotes_reEmitsWhenANoteIsUpserted() = runBlocking {
-        noteDao.upsertNotes(listOf(note("first", favorite = false)))
+        noteDao.upsertNotes(listOf(note("first", isFavorite = false)))
         assertEquals(1, noteDao.getNotes().first().size)
 
         // The property the feed depends on: a page written in has to reach a live subscriber
         // without anyone re-querying.
-        noteDao.upsertNotes(listOf(note("second", favorite = false)))
+        noteDao.upsertNotes(listOf(note("second", isFavorite = false)))
 
         assertEquals(2, noteDao.getNotes().first().size)
     }
@@ -113,16 +113,16 @@ class NoteDaoTest {
     fun upsertNotes_thenGetFavoriteNotes_returnsOnlyFavorites() = runBlocking {
         noteDao.upsertNotes(
             listOf(
-                note("fav1", favorite = true),
-                note("fav2", favorite = true),
-                note("notFav", favorite = false),
+                note("fav1", isFavorite = true),
+                note("fav2", isFavorite = true),
+                note("notFav", isFavorite = false),
             )
         )
 
         val favorites = noteDao.getFavoriteNotes().first()
 
         assertEquals(2, favorites.size)
-        assertTrue(favorites.all { it.favorite })
+        assertTrue(favorites.all { it.isFavorite })
         assertFalse(favorites.any { it.noteId == "notFav" })
     }
 
@@ -146,8 +146,8 @@ class NoteDaoTest {
 
     @Test
     fun upsertNotes_replacesOnConflictByPrimaryKey() = runBlocking {
-        noteDao.upsertNotes(listOf(note("doc", favorite = true).copy(text = "original")))
-        noteDao.upsertNotes(listOf(note("doc", favorite = true).copy(text = "updated")))
+        noteDao.upsertNotes(listOf(note("doc", isFavorite = true).copy(text = "original")))
+        noteDao.upsertNotes(listOf(note("doc", isFavorite = true).copy(text = "updated")))
 
         val favorites = noteDao.getFavoriteNotes().first()
 
@@ -168,7 +168,7 @@ class NoteDaoTest {
 
     @Test
     fun updateFavorite_toFalse_removesNoteFromFavorites() = runBlocking {
-        noteDao.upsertNotes(listOf(note("doc", favorite = true)))
+        noteDao.upsertNotes(listOf(note("doc", isFavorite = true)))
 
         noteDao.updateFavorite("doc", isFavorite = false)
 
@@ -186,7 +186,7 @@ class NoteDaoTest {
 
     @Test
     fun clearAllNotes_removesEveryNoteRegardlessOfFavoriteFlag() = runBlocking {
-        noteDao.upsertNotes(listOf(note("fav", favorite = true), note("notFav", favorite = false)))
+        noteDao.upsertNotes(listOf(note("fav", isFavorite = true), note("notFav", isFavorite = false)))
 
         noteDao.clearAllNotes()
 
@@ -213,7 +213,7 @@ class NoteDaoTest {
         val media = listOf(
             MediaDetail(
                 photoUrl = "https://example.com/photo.jpg",
-                generatedText = listOf("a cat"),
+                generatedTexts = listOf("a cat"),
                 generatedLabels = listOf(DetectedLabel("animal", 0.9)),
             )
         )
@@ -223,7 +223,7 @@ class NoteDaoTest {
 
         assertEquals(1, restored.mediaList?.size)
         assertEquals("https://example.com/photo.jpg", restored.mediaList?.first()?.photoUrl)
-        assertEquals(listOf("a cat"), restored.mediaList?.first()?.generatedText)
+        assertEquals(listOf("a cat"), restored.mediaList?.first()?.generatedTexts)
         assertEquals("animal", restored.mediaList?.first()?.generatedLabels?.first()?.label)
     }
 }

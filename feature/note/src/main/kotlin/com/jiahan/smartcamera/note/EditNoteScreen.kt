@@ -64,7 +64,7 @@ import com.jiahan.smartcamera.common.bounceClick
 import com.jiahan.smartcamera.common.shimmer
 import com.jiahan.smartcamera.common.showAppSnackbar
 import com.jiahan.smartcamera.core.ui.R as UiR
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 
 /**
  * Edits an existing note's text. Its media is fixed at creation time, so it is rendered read-only
@@ -102,22 +102,22 @@ fun EditNoteScreen(
     // Every way out of an edited note routes through the confirmation: the top bar arrow, Cancel,
     // and -- via BackHandler below -- the system back gesture, which would otherwise skip it.
     val leaveScreen = {
-        if (hasUnsavedChanges) viewModel.setShowDiscardDialog(true) else discardAndLeave()
+        if (hasUnsavedChanges) viewModel.showDiscardDialog() else discardAndLeave()
     }
 
     BackHandler(enabled = hasUnsavedChanges && !isSaving) {
-        viewModel.setShowDiscardDialog(true)
+        viewModel.showDiscardDialog()
     }
 
-    if (uiState.showDiscardDialog) {
+    if (uiState.isDiscardDialogVisible) {
         AlertDialog(
-            onDismissRequest = { viewModel.setShowDiscardDialog(false) },
+            onDismissRequest = viewModel::dismissDiscardDialog,
             title = { Text(stringResource(R.string.discard_changes)) },
             text = { Text(stringResource(R.string.discard_changes_desc)) },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.setShowDiscardDialog(false)
+                        viewModel.dismissDiscardDialog()
                         discardAndLeave()
                     }
                 ) {
@@ -125,7 +125,7 @@ fun EditNoteScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.setShowDiscardDialog(false) }) {
+                TextButton(onClick = viewModel::dismissDiscardDialog) {
                     Text(stringResource(UiR.string.cancel))
                 }
             }
@@ -303,7 +303,7 @@ fun EditNoteScreen(
                                     }
 
                                     TextButton(
-                                        onClick = { viewModel.saveNote() },
+                                        onClick = viewModel::saveNote,
                                         enabled = saveButtonEnabled
                                     ) {
                                         Text(text = stringResource(R.string.save))
@@ -330,7 +330,7 @@ fun EditNoteScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReadOnlyNoteMedia(
-    note: HomeNote,
+    note: Note,
     onNavigateToPhotoPreview: (url: String) -> Unit,
     onNavigateToVideoPreview: (url: String) -> Unit,
     onImageLoadError: (Throwable) -> Unit

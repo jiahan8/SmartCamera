@@ -8,10 +8,10 @@ import com.jiahan.smartcamera.data.datastore.UserPreferencesRepository
 import com.jiahan.smartcamera.data.repository.AnalyticsRepository
 import com.jiahan.smartcamera.data.repository.MediaFileRepository
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.domain.NoteMediaDetail
 import com.jiahan.smartcamera.util.AppConstants.MAX_NOTE_MEDIA_ITEMS
-import com.jiahan.smartcamera.util.AppConstants.MAX_POST_TEXT_LENGTH
+import com.jiahan.smartcamera.util.AppConstants.MAX_NOTE_TEXT_LENGTH
 import com.jiahan.smartcamera.util.AppConstants.STATEFLOW_WHILE_SUBSCRIBED_MS
 import com.jiahan.smartcamera.util.ErrorHandler
 import com.jiahan.smartcamera.util.ErrorTag
@@ -37,8 +37,8 @@ sealed interface UploadStatus {
 }
 
 data class NoteUiState(
-    val postText: String = "",
-    val postTextError: String? = null,
+    val noteText: String = "",
+    val noteTextError: String? = null,
     val photoUri: Uri? = null,
     val videoUri: Uri? = null,
     val mediaList: List<NoteMediaDetail> = emptyList(),
@@ -61,8 +61,8 @@ class NoteViewModel @Inject constructor(
 
     init {
         incomingShareHandler.consume()?.let { share ->
-            if (!share.text.isNullOrBlank()) updatePostText(share.text)
-            if (share.uris.isNotEmpty()) updateUriList(share.uris)
+            if (!share.text.isNullOrBlank()) updateNoteText(share.text)
+            if (share.uris.isNotEmpty()) addMedia(share.uris)
         }
     }
 
@@ -70,11 +70,11 @@ class NoteViewModel @Inject constructor(
         errorHandler.logError(throwable, tag = ErrorTag.IMAGE_LOAD)
     }
 
-    val postButtonEnabled = _uiState
+    val saveButtonEnabled = _uiState
         .map { state ->
             state.uploadStatus !is UploadStatus.Uploading &&
-                    (state.postText.isNotBlank() || state.mediaList.isNotEmpty()) &&
-                    state.postTextError == null
+                    (state.noteText.isNotBlank() || state.mediaList.isNotEmpty()) &&
+                    state.noteTextError == null
         }
         .distinctUntilChanged()
         .stateIn(
@@ -83,7 +83,7 @@ class NoteViewModel @Inject constructor(
             initialValue = false
         )
 
-    private val userPreferences = userPreferencesRepository.userPreferencesFlow
+    private val userPreferences = userPreferencesRepository.userPreferences
         .distinctUntilChanged()
         .stateIn(
             scope = viewModelScope,
@@ -91,7 +91,7 @@ class NoteViewModel @Inject constructor(
             initialValue = UserPreferences(
                 isDarkTheme = false,
                 username = "",
-                profilePicture = null
+                profilePictureUrl = null
             )
         )
 
@@ -99,19 +99,19 @@ class NoteViewModel @Inject constructor(
         .map { it.username }
         .distinctUntilChanged()
 
-    val profilePicture = userPreferences
-        .map { it.profilePicture }
+    val profilePictureUrl = userPreferences
+        .map { it.profilePictureUrl }
         .distinctUntilChanged()
 
-    fun uploadPost() {
-        val text = _uiState.value.postText.trim().ifBlank { null }
+    fun saveNote() {
+        val text = _uiState.value.noteText.trim().ifBlank { null }
         val media = _uiState.value.mediaList
         viewModelScope.launch {
             _uiState.update { it.copy(uploadStatus = UploadStatus.Uploading) }
-            noteRepository.uploadMediaToFirebase(media)
+            noteRepository.uploadMedia(media)
                 .onSuccess { mediaDetailList ->
                     noteRepository.addNote(
-                        HomeNote(
+                        Note(
                             noteId = "",
                             text = text,
                             mediaList = mediaDetailList,
@@ -139,17 +139,17 @@ class NoteViewModel @Inject constructor(
         }
     }
 
-    fun resetUploadState() {
+    fun resetUploadStatus() {
         _uiState.update { it.copy(uploadStatus = UploadStatus.Idle) }
     }
 
-    fun createImageUri(): Uri? = mediaFileRepository.createImageUri()
+    fun createPhotoUri(): Uri? = mediaFileRepository.createPhotoUri()
 
     fun createVideoUri(): Uri? = mediaFileRepository.createVideoUri()
 
     fun cancelPhotoCapture(uri: Uri) {
         viewModelScope.launch {
-            noteRepository.quickUploadMediaToFirebase(
+            noteRepository.uploadMediaToCache(
                 listOf(uri.toMediaUri()),
                 deleteAfterUpload = true
             )
@@ -159,7 +159,7 @@ class NoteViewModel @Inject constructor(
 
     fun cancelVideoCapture(uri: Uri) {
         viewModelScope.launch {
-            noteRepository.quickUploadMediaToFirebase(
+            noteRepository.uploadMediaToCache(
                 listOf(uri.toMediaUri()),
                 deleteAfterUpload = true
             )
@@ -167,13 +167,13 @@ class NoteViewModel @Inject constructor(
         _uiState.update { it.copy(videoUri = null) }
     }
 
-    fun updatePostText(text: String) {
-        analyticsRepository.logNoteCustomEvent(text)
+    fun updateNoteText(text: String) {
+        analyticsRepository.logNoteCreate(text)
         _uiState.update {
             it.copy(
-                postText = text,
-                postTextError = when {
-                    text.length > MAX_POST_TEXT_LENGTH ->
+                noteText = text,
+                noteTextError = when {
+                    text.length > MAX_NOTE_TEXT_LENGTH ->
                         resourceProvider.getString(CommonR.string.note_validation)
 
                     else -> null
@@ -182,9 +182,9 @@ class NoteViewModel @Inject constructor(
         }
     }
 
-    fun updateUriList(uriList: List<Uri>) {
+    fun addMedia(uriList: List<Uri>) {
         val mediaUriList = uriList.map { it.toMediaUri() }
-        viewModelScope.launch { noteRepository.quickUploadMediaToFirebase(mediaUriList) }
+        viewModelScope.launch { noteRepository.uploadMediaToCache(mediaUriList) }
 
         viewModelScope.launch {
             noteRepository.buildLocalMediaDetails(mediaUriList)
@@ -208,11 +208,11 @@ class NoteViewModel @Inject constructor(
                         }
                     }
                 }
-                .onFailure { e -> errorHandler.logError(e) }
+                .onFailure(errorHandler::logError)
         }
     }
 
-    fun removeUriFromList(index: Int) {
+    fun removeMediaAt(index: Int) {
         _uiState.update { state ->
             if (index in state.mediaList.indices) {
                 state.copy(mediaList = state.mediaList.filterIndexed { i, _ -> i != index })

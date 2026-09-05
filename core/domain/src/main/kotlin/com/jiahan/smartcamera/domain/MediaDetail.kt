@@ -1,5 +1,6 @@
 package com.jiahan.smartcamera.domain
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -14,7 +15,7 @@ data class MediaDetail(
     val videoUrl: String? = null,
     val thumbnailUrl: String? = null,
     val isVideo: Boolean = false,
-    val generatedText: List<String>? = null,
+    @SerialName("generatedText") val generatedTexts: List<String>? = null,
     val generatedObjects: List<DetectedObject>? = null,
     val generatedLabels: List<DetectedLabel>? = null,
     val generatedLandmarks: List<DetectedLabel>? = null,

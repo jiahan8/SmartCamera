@@ -12,15 +12,15 @@ import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
 import com.jiahan.smartcamera.feature.preview.R
 import com.jiahan.smartcamera.core.ui.R as UiR
-import com.jiahan.smartcamera.domain.HomeNote
 import com.jiahan.smartcamera.domain.MediaDetail
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.fake.FakeErrorHandler
 import com.jiahan.smartcamera.fake.FakeMediaFileRepository
 import com.jiahan.smartcamera.fake.FakeNoteRepository
 import com.jiahan.smartcamera.fake.FakeResourceProvider
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -55,7 +55,7 @@ class NotePreviewScreenTest {
         noteId: String = "note1",
         text: String? = "Note body",
         mediaList: List<MediaDetail>? = null,
-    ) = HomeNote(
+    ) = Note(
         noteId = noteId,
         text = text,
         username = "tester",
@@ -66,7 +66,7 @@ class NotePreviewScreenTest {
         val errorHandler = FakeErrorHandler()
         val noteErrorReporter = NoteErrorReporter(errorHandler)
         val viewModel = NotePreviewViewModel(
-            savedStateHandle = SavedStateHandle(mapOf("id" to noteId)),
+            savedStateHandle = SavedStateHandle(mapOf("noteId" to noteId)),
             noteRepository = noteRepository,
             noteErrorReporter = noteErrorReporter,
             errorHandler = errorHandler,
@@ -77,7 +77,7 @@ class NotePreviewScreenTest {
             ),
         )
         composeTestRule.setContent {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 NotePreviewScreen(
                     onBack = { navigatedBack = true },
                     onNavigateToPhotoPreview = { navigatedToPhotoPreviewUrl = it },

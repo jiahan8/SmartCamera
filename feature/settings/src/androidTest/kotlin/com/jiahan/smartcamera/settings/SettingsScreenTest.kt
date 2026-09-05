@@ -22,7 +22,7 @@ import com.jiahan.smartcamera.fake.FakeAuthRepository
 import com.jiahan.smartcamera.fake.FakeErrorHandler
 import com.jiahan.smartcamera.fake.FakeResourceProvider
 import com.jiahan.smartcamera.fake.FakeUserPreferencesRepository
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -52,7 +52,7 @@ class SettingsScreenTest {
             errorHandler = FakeErrorHandler(),
         )
         composeTestRule.setContent {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 SettingsScreen(
                     onBack = {},
                     onNavigateToAuth = { navigatedToAuth = true },

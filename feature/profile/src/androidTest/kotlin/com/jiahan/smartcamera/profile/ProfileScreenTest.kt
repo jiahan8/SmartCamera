@@ -22,7 +22,7 @@ import com.jiahan.smartcamera.fake.FakeResourceProvider
 import com.jiahan.smartcamera.fake.FakeUserPreferencesRepository
 import com.jiahan.smartcamera.fake.FakeUserRepository
 import com.jiahan.smartcamera.feature.profile.R
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -63,7 +63,7 @@ class ProfileScreenTest {
             errorHandler = FakeErrorHandler(),
         )
         composeTestRule.setContent {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 ProfileScreen(
                     onNavigateToSettings = {},
                     onNavigateToPhotoPreview = {},
@@ -81,7 +81,7 @@ class ProfileScreenTest {
             metadata = "meta",
             displayName = "John Doe",
             username = "johndoe",
-            profilePicture = null,
+            profilePictureUrl = null,
             createdDate = Instant.fromEpochMilliseconds(0L),
         )
     }

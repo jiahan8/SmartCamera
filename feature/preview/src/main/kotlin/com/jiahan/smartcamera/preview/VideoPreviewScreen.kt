@@ -119,7 +119,7 @@ fun VideoPreviewScreen(
             },
             actions = {
                 IconButton(
-                    onClick = { viewModel.shareVideo() },
+                    onClick = viewModel::shareVideo,
                     enabled = !isSharing
                 ) {
                     if (isSharing) {

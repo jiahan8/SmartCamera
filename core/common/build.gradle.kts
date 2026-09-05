@@ -57,7 +57,7 @@ dependencies {
 
     // api, not implementation: `MediaUri` is MediaUriExt's return type and `ValidationError`
     // validationErrorMessageResId's parameter, so every caller compiles against :core:domain
-    // through this edge. Same reasoning as :core:ui's edge for HomeNote.
+    // through this edge. Same reasoning as :core:ui's edge for Note.
     api(project(":core:domain"))
 
     // `androidx.core.net.toUri`, in MediaUriExt.

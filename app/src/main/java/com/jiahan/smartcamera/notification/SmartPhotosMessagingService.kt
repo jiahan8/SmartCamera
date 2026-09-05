@@ -66,7 +66,7 @@ class SmartPhotosMessagingService : FirebaseMessagingService() {
         super.onNewToken(token)
         serviceScope.launch {
             userRepository.updateFcmToken(token)
-                .onFailure { e -> errorHandler.logError(e) }
+                .onFailure(errorHandler::logError)
         }
     }
 

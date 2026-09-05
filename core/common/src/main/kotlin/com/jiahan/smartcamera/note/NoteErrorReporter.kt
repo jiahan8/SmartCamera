@@ -27,8 +27,8 @@ class NoteErrorReporter @Inject constructor(
         _actionError.tryEmit(message)
     }
 
-    fun reportError(e: Throwable) {
-        errorHandler.logError(e)
-        _actionError.tryEmit(errorHandler.getErrorMessage(e))
+    fun reportError(throwable: Throwable) {
+        errorHandler.logError(throwable)
+        _actionError.tryEmit(errorHandler.getErrorMessage(throwable))
     }
 }

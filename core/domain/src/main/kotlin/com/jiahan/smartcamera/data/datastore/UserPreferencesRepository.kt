@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
  * Remote user-profile operations live in [com.jiahan.smartcamera.data.repository.UserRepository].
  */
 interface UserPreferencesRepository {
-    val userPreferencesFlow: Flow<UserPreferences>
-    suspend fun updateDarkThemeVisibility(isDarkTheme: Boolean): Result<Unit>
+    val userPreferences: Flow<UserPreferences>
+    suspend fun setDarkTheme(enabled: Boolean): Result<Unit>
     suspend fun updateLocalUserProfile(username: String, profilePictureUrl: String?): Result<Unit>
 }

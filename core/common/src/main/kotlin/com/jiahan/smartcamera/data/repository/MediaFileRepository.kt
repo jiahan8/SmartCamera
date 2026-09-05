@@ -32,7 +32,7 @@ interface MediaFileRepository {
      * that can be passed directly to the TakePicture activity-result contract.
      * Returns `null` if the file could not be created.
      */
-    fun createImageUri(): Uri?
+    fun createPhotoUri(): Uri?
 
     /**
      * Creates a temporary MP4 file in the app cache and returns a FileProvider URI
@@ -73,5 +73,5 @@ interface MediaFileRepository {
      * Deletes the file represented by [uri] via the content resolver.
      * Safe to call with a FileProvider URI pointing at a cache file.
      */
-    fun deleteUri(uri: Uri)
+    fun deleteFile(uri: Uri)
 }

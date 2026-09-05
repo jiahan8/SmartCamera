@@ -4,7 +4,7 @@ import app.cash.turbine.test
 import com.jiahan.smartcamera.MainDispatcherRule
 import com.jiahan.smartcamera.data.repository.AnalyticsRepository
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.util.AppConstants.DEBOUNCE_MS
@@ -54,12 +54,12 @@ class SearchViewModelTest {
      * `searchNotes` returns -- which is what lets a mutation made on another screen show up here
      * with no `NoteHandler` event in between.
      */
-    private val notesMirror = MutableStateFlow<List<HomeNote>>(emptyList())
+    private val notesMirror = MutableStateFlow<List<Note>>(emptyList())
 
     @Before
     fun setUp() {
-        every { analyticsRepository.logSearchEvent(any()) } just runs
-        every { analyticsRepository.logSearchCustomEvent(any()) } just runs
+        every { analyticsRepository.logSearch(any()) } just runs
+        every { analyticsRepository.logNoteSearch(any()) } just runs
         every { errorHandler.logError(any()) } just runs
         every { errorHandler.getErrorMessage(any()) } returns "Error"
         every { noteRepository.searchNotesStream(any()) } answers {
@@ -76,13 +76,13 @@ class SearchViewModelTest {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private fun matchesQuery(note: HomeNote, query: String) =
+    private fun matchesQuery(note: Note, query: String) =
         query.isBlank() || note.text?.contains(query, ignoreCase = true) == true
 
-    private fun makeNote(id: String, favorite: Boolean = false, text: String = "text $id") =
-        HomeNote(noteId = id, username = "user", favorite = favorite, text = text)
+    private fun makeNote(id: String, isFavorite: Boolean = false, text: String = "text $id") =
+        Note(noteId = id, username = "user", isFavorite = isFavorite, text = text)
 
-    private fun mirror(notes: List<HomeNote>) {
+    private fun mirror(notes: List<Note>) {
         notesMirror.update { existing ->
             val refreshed = existing.map { old ->
                 notes.firstOrNull { it.noteId == old.noteId } ?: old
@@ -95,7 +95,7 @@ class SearchViewModelTest {
      * Stubs the remote search and mirrors what it returns, the way the real `searchNotes` writes
      * its results through. A stub that only returns is a stub that renders nothing.
      */
-    private fun stubSearch(notes: List<HomeNote>, query: String? = null) {
+    private fun stubSearch(notes: List<Note>, query: String? = null) {
         if (query == null) {
             coEvery { noteRepository.searchNotes(any()) } coAnswers {
                 mirror(notes)
@@ -127,7 +127,7 @@ class SearchViewModelTest {
         return viewModel
     }
 
-    private fun SearchViewModel.notes(): List<HomeNote> =
+    private fun SearchViewModel.notes(): List<Note> =
         (content.value as SearchContent.Success).notes
 
     // -------------------------------------------------------------------------
@@ -412,13 +412,13 @@ class SearchViewModelTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `favoriteNote toggle reaches the results through the mirror`() =
+    fun `toggleFavorite reaches the results through the mirror`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val note = makeNote("doc1", favorite = false, text = "cat a")
+            val note = makeNote("doc1", isFavorite = false, text = "cat a")
             stubSearch(listOf(note), query = "cat")
-            coEvery { noteRepository.favoriteNote(note) } coAnswers {
+            coEvery { noteRepository.toggleFavorite(note) } coAnswers {
                 notesMirror.update { notes ->
-                    notes.map { if (it.noteId == "doc1") it.copy(favorite = true) else it }
+                    notes.map { if (it.noteId == "doc1") it.copy(isFavorite = true) else it }
                 }
                 Result.success(Unit)
             }
@@ -426,20 +426,20 @@ class SearchViewModelTest {
             viewModel.updateSearchQuery("cat")
             advanceTimeBy((DEBOUNCE_MS + 1).milliseconds)
 
-            viewModel.favoriteNote(note)
+            viewModel.toggleFavorite(note)
             advanceTimeBy(1.milliseconds)
 
-            assertTrue(viewModel.notes().single().favorite) // false → true
+            assertTrue(viewModel.notes().single().isFavorite) // false → true
         }
 
     @Test
-    fun `favoriteNote failure emits action error`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { noteRepository.favoriteNote(any()) } returns Result.failure(RuntimeException())
+    fun `toggleFavorite failure emits action error`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { noteRepository.toggleFavorite(any()) } returns Result.failure(RuntimeException())
         every { errorHandler.getErrorMessage(any()) } returns "fav error"
         val viewModel = searchViewModel()
 
         viewModel.actionError.test {
-            viewModel.favoriteNote(makeNote("doc1"))
+            viewModel.toggleFavorite(makeNote("doc1"))
             advanceTimeBy(1.milliseconds)
             assertEquals("fav error", awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -496,7 +496,7 @@ class SearchViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             stubSearch(
                 listOf(
-                    makeNote("doc1", favorite = false, text = "cat a"),
+                    makeNote("doc1", isFavorite = false, text = "cat a"),
                     makeNote("doc2", text = "cat b")
                 ),
                 query = "cat"
@@ -506,10 +506,10 @@ class SearchViewModelTest {
             advanceTimeBy((DEBOUNCE_MS + 1).milliseconds)
 
             notesMirror.update { notes ->
-                notes.map { if (it.noteId == "doc1") it.copy(favorite = true) else it }
+                notes.map { if (it.noteId == "doc1") it.copy(isFavorite = true) else it }
             }
             advanceTimeBy(1.milliseconds)
 
-            assertTrue(viewModel.notes().first { it.noteId == "doc1" }.favorite)
+            assertTrue(viewModel.notes().first { it.noteId == "doc1" }.isFavorite)
         }
 }

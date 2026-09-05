@@ -11,7 +11,7 @@ import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.search.SearchScreen
 import com.jiahan.smartcamera.search.SearchViewModel
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import org.junit.Test
 import org.robolectric.RuntimeEnvironment
 
@@ -43,14 +43,14 @@ class SearchScreenScreenshotTest : BaseScreenshotTest() {
             errorHandler = errorHandler,
         )
         capture {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 SearchScreen(
                     onNavigateToNotePreview = {},
                     onNavigateToEditNote = {},
                     onNavigateToPhotoPreview = {},
                     onNavigateToVideoPreview = {},
                     viewModel = viewModel,
-                    scrollToTop = null,
+                    scrollToTopRequestedAt = null,
                     onScrollToTopConsumed = {},
                     snackbarHostState = remember { SnackbarHostState() },
                 )

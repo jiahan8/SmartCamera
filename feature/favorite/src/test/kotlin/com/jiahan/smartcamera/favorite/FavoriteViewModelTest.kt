@@ -4,7 +4,7 @@ import app.cash.turbine.test
 import com.jiahan.smartcamera.MainDispatcherRule
 import com.jiahan.smartcamera.data.repository.AnalyticsRepository
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.util.AppConstants
@@ -47,7 +47,7 @@ class FavoriteViewModelTest {
 
     @Before
     fun setUp() {
-        every { analyticsRepository.logFavoriteSearchCustomEvent(any()) } just runs
+        every { analyticsRepository.logFavoriteSearch(any()) } just runs
         every { errorHandler.logError(any()) } just runs
         every { errorHandler.getErrorMessage(any()) } returns "Error"
         coEvery { noteRepository.syncFavoriteNotes() } returns Result.success(Unit)
@@ -70,8 +70,8 @@ class FavoriteViewModelTest {
     @After
     fun tearDown() = unmockkAll()
 
-    private fun makeNote(id: String, favorite: Boolean = true) = HomeNote(
-        noteId = id, username = "user", favorite = favorite, text = "text $id"
+    private fun makeNote(id: String, isFavorite: Boolean = true) = Note(
+        noteId = id, username = "user", isFavorite = isFavorite, text = "text $id"
     )
 
     // -------------------------------------------------------------------------
@@ -255,26 +255,26 @@ class FavoriteViewModelTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `favoriteNote toggles through the repository`() =
+    fun `toggleFavorite goes through the repository`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val note = makeNote("doc1", favorite = true)
-            coEvery { noteRepository.favoriteNote(note) } returns Result.success(Unit)
+            val note = makeNote("doc1", isFavorite = true)
+            coEvery { noteRepository.toggleFavorite(note) } returns Result.success(Unit)
 
-            viewModel.favoriteNote(note)
+            viewModel.toggleFavorite(note)
             advanceUntilIdle()
 
             // The repository owns the toggle and upserts the flipped row; the delegate no longer
             // announces it, because every screen reads that row.
-            coVerify { noteRepository.favoriteNote(note) }
+            coVerify { noteRepository.toggleFavorite(note) }
         }
 
     @Test
-    fun `favoriteNote failure emits action error`() = runTest(mainDispatcherRule.testDispatcher) {
-        coEvery { noteRepository.favoriteNote(any()) } returns Result.failure(RuntimeException())
+    fun `toggleFavorite failure emits action error`() = runTest(mainDispatcherRule.testDispatcher) {
+        coEvery { noteRepository.toggleFavorite(any()) } returns Result.failure(RuntimeException())
         every { errorHandler.getErrorMessage(any()) } returns "fav error"
 
         viewModel.actionError.test {
-            viewModel.favoriteNote(makeNote("doc1"))
+            viewModel.toggleFavorite(makeNote("doc1"))
             advanceUntilIdle()
             assertEquals("fav error", awaitItem())
             cancelAndIgnoreRemainingEvents()

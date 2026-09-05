@@ -13,27 +13,27 @@ class FakeAnalyticsRepository : AnalyticsRepository {
 
     override fun setUserId(userId: String?) {}
 
-    override fun logSearchEvent(value: String) {}
+    override fun logSearch(query: String) {}
 
-    override fun logSearchCustomEvent(value: String) {}
+    override fun logNoteSearch(query: String) {}
 
-    override fun logNoteCustomEvent(value: String) {}
+    override fun logNoteCreate(text: String) {}
 
-    override fun logEditNoteCustomEvent(value: String) {}
+    override fun logNoteEdit(text: String) {}
 
-    override fun logFavoriteSearchCustomEvent(value: String) {}
+    override fun logFavoriteSearch(query: String) {}
 
-    override fun logExploreSearchCustomEvent(value: String) {}
+    override fun logExploreSearch(query: String) {}
 
-    override fun logTextCustomEvent(value: String) {
-        lastLoggedText = value
+    override fun logText(text: String) {
+        lastLoggedText = text
     }
 
-    override fun logDisplayNameCustomEvent(value: String) {
-        lastLoggedDisplayName = value
+    override fun logDisplayName(displayName: String) {
+        lastLoggedDisplayName = displayName
     }
 
-    override fun logUsernameCustomEvent(value: String) {
-        lastLoggedUsername = value
+    override fun logUsername(username: String) {
+        lastLoggedUsername = username
     }
 }

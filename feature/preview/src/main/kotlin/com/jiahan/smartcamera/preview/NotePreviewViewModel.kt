@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.util.AppConstants.STATEFLOW_WHILE_SUBSCRIBED_MS
@@ -24,12 +24,12 @@ import javax.inject.Inject
 
 sealed interface NotePreviewContent {
     data object Loading : NotePreviewContent
-    data class Success(val note: HomeNote) : NotePreviewContent
+    data class Success(val note: Note) : NotePreviewContent
     data class Error(val message: String) : NotePreviewContent
 }
 
 data class NotePreviewUiState(
-    val noteToDelete: HomeNote? = null
+    val noteToDelete: Note? = null
 )
 
 /** As on Home: it decides only what a missing row means, never what a present one does. */
@@ -48,7 +48,7 @@ class NotePreviewViewModel @Inject constructor(
     private val noteShare: NoteShareDelegate
 ) : ViewModel() {
 
-    private val noteId: String = savedStateHandle.toRoute<NotePreviewRoute>().id
+    private val noteId: String = savedStateHandle.toRoute<NotePreviewRoute>().noteId
 
     private val _uiState = MutableStateFlow(NotePreviewUiState())
     val uiState = _uiState.asStateFlow()
@@ -105,18 +105,18 @@ class NotePreviewViewModel @Inject constructor(
         }
     }
 
-    fun favoriteNote(homeNote: HomeNote) {
+    fun toggleFavorite(note: Note) {
         viewModelScope.launch {
-            noteRepository.favoriteNote(homeNote)
+            noteRepository.toggleFavorite(note)
                 .onFailure { e -> noteErrorReporter.reportError(e) }
         }
     }
 
-    fun setNoteToDelete(note: HomeNote?) {
+    fun setNoteToDelete(note: Note?) {
         _uiState.update { it.copy(noteToDelete = note) }
     }
 
-    fun shareNote(note: HomeNote) {
+    fun shareNote(note: Note) {
         viewModelScope.launch { noteShare.shareNote(note) }
     }
 }

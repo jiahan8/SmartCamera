@@ -57,8 +57,8 @@ class MainActivity : ComponentActivity() {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val startDestination = uiState.startDestination
             val isAppReady = uiState.isAppReady
-            val showBottomBar = uiState.showBottomBar
-            val scrollToTop = uiState.scrollToTop
+            val isBottomBarVisible = uiState.isBottomBarVisible
+            val scrollToTopRequestedAt = uiState.scrollToTopRequestedAt
             val hasPendingShare by viewModel.hasPendingShare.collectAsStateWithLifecycle()
             val pendingNoteId = uiState.pendingNoteId
             val updateState by viewModel.updateState.collectAsStateWithLifecycle()
@@ -105,8 +105,8 @@ class MainActivity : ComponentActivity() {
                 isDarkTheme = isDarkTheme,
                 isAppReady = isAppReady,
                 startDestination = startDestination,
-                showBottomBar = showBottomBar,
-                scrollToTop = scrollToTop,
+                isBottomBarVisible = isBottomBarVisible,
+                scrollToTopRequestedAt = scrollToTopRequestedAt,
                 hasPendingShare = hasPendingShare,
                 pendingNoteId = pendingNoteId,
                 isUpdateReadyToInstall = updateState is AppUpdateState.Downloaded,
@@ -128,7 +128,7 @@ class MainActivity : ComponentActivity() {
 
     private fun handleNotificationIntent(intent: Intent) {
         intent.getStringExtra(EXTRA_NOTE_ID)?.let { noteId ->
-            viewModel.onNotificationNoteIdReceived(noteId)
+            viewModel.openNoteFromNotification(noteId)
         }
     }
 }

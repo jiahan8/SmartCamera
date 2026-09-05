@@ -17,8 +17,8 @@ import com.jiahan.smartcamera.database.dao.NoteDao
 import com.jiahan.smartcamera.database.data.DatabaseNote
 import com.jiahan.smartcamera.database.data.toDatabaseNote
 import com.jiahan.smartcamera.domain.AppError
-import com.jiahan.smartcamera.domain.HomeNote
 import com.jiahan.smartcamera.domain.MediaUri
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.domain.NoteMediaDetail
 import com.jiahan.smartcamera.util.ErrorHandler
 import io.mockk.coEvery
@@ -109,7 +109,7 @@ class DefaultNoteRepositoryTest {
         mediaFileRepository = mediaFileRepository,
         errorHandler = errorHandler,
         // SupervisorJob mirrors di/AppModule's @ApplicationScope: without it a failing child of
-        // quickUploadMediaToFirebase would cancel its siblings and the scope, a failure mode
+        // uploadMediaToCache would cancel its siblings and the scope, a failure mode
         // production does not have.
         applicationScope = CoroutineScope(SupervisorJob() + dispatcher),
         ioDispatcher = dispatcher,
@@ -238,15 +238,15 @@ class DefaultNoteRepositoryTest {
     }
 
     // -------------------------------------------------------------------------
-    // uploadMediaToFirebase
+    // uploadMedia
     // -------------------------------------------------------------------------
 
     @Test
-    fun `uploadMediaToFirebase signed out fails as NotAuthenticated`() =
+    fun `uploadMedia signed out fails as NotAuthenticated`() =
         runTest(dispatcher) {
             every { authRepository.currentUserId } returns null
 
-            val result = repository.uploadMediaToFirebase(
+            val result = repository.uploadMedia(
                 listOf(NoteMediaDetail(photoUri = MediaUri("file:///tmp/photo.jpg")))
             )
 
@@ -271,7 +271,7 @@ class DefaultNoteRepositoryTest {
         assertEquals(1, cached.size)
         assertEquals(NOTE_ID, cached.single().noteId)
         // The note is not favorited: before this change nothing would have been written at all.
-        assertFalse(cached.single().favorite)
+        assertFalse(cached.single().isFavorite)
     }
 
     @Test
@@ -288,24 +288,24 @@ class DefaultNoteRepositoryTest {
     }
 
     @Test
-    fun `favoriteNote keeps the row when a note is unfavorited`() = runTest(dispatcher) {
+    fun `toggleFavorite keeps the row when a note is unfavorited`() = runTest(dispatcher) {
         every { noteDocumentRef.update(FIELD_FAVORITE, any()) } returns Tasks.forResult(null)
 
-        val result = repository.favoriteNote(homeNote(favorite = true))
+        val result = repository.toggleFavorite(makeNote(isFavorite = true))
 
         assertTrue(result.isSuccess)
         // Not noteDao.deleteNote: the note still exists, it is just no longer favorited.
         coVerify(exactly = 0) { noteDao.deleteNote(any()) }
         val cached = captureCachedNotes()
         assertEquals(NOTE_ID, cached.single().noteId)
-        assertFalse(cached.single().favorite)
+        assertFalse(cached.single().isFavorite)
     }
 
     @Test
     fun `updateNote caches a note that is not favorited`() = runTest(dispatcher) {
         stubCallable()
 
-        val result = repository.updateNote(homeNote(favorite = false).copy(text = "edited"))
+        val result = repository.updateNote(makeNote(isFavorite = false).copy(text = "edited"))
 
         assertTrue(result.isSuccess)
         val cached = captureCachedNotes()
@@ -315,7 +315,7 @@ class DefaultNoteRepositoryTest {
     @Test
     fun `getNotesStream maps the mirrored rows to domain notes`() = runTest(dispatcher) {
         every { noteDao.getNotes(any<Int>()) } returns flowOf(
-            listOf(homeNote(favorite = false).toDatabaseNote())
+            listOf(makeNote(isFavorite = false).toDatabaseNote())
         )
 
         val notes = repository.getNotesStream(limit = 10).first()
@@ -324,7 +324,7 @@ class DefaultNoteRepositoryTest {
         assertEquals("alice", notes.single().username)
         // The query itself -- that it returns non-favorites, newest first, and re-emits on a write
         // -- is NoteDaoTest's job, against a real database. This pins only the mapping.
-        assertFalse(notes.single().favorite)
+        assertFalse(notes.single().isFavorite)
     }
 
     @Test
@@ -345,7 +345,7 @@ class DefaultNoteRepositoryTest {
     @Test
     fun `getNoteStream maps the row and emits null once it is gone`() = runTest(dispatcher) {
         every { noteDao.getNote(NOTE_ID) } returns
-                flowOf(homeNote(favorite = true).toDatabaseNote())
+                flowOf(makeNote(isFavorite = true).toDatabaseNote())
         assertEquals(NOTE_ID, repository.getNoteStream(NOTE_ID).first()?.noteId)
 
         every { noteDao.getNote(NOTE_ID) } returns flowOf(null)
@@ -356,9 +356,9 @@ class DefaultNoteRepositoryTest {
     fun `searchNotesStream filters the mirror by text`() = runTest(dispatcher) {
         every { noteDao.getNotes() } returns flowOf(
             listOf(
-                homeNote(favorite = false).copy(noteId = "a", text = "grocery list")
+                makeNote(isFavorite = false).copy(noteId = "a", text = "grocery list")
                     .toDatabaseNote(),
-                homeNote(favorite = false).copy(noteId = "b", text = "meeting notes")
+                makeNote(isFavorite = false).copy(noteId = "b", text = "meeting notes")
                     .toDatabaseNote()
             )
         )
@@ -409,7 +409,7 @@ class DefaultNoteRepositoryTest {
     fun `addNote reads the created note back into the mirror`() = runTest(dispatcher) {
         stubCallable(callableResult(mapOf("documentPath" to NOTE_ID)))
 
-        val result = repository.addNote(homeNote(favorite = false).copy(noteId = ""))
+        val result = repository.addNote(makeNote(isFavorite = false).copy(noteId = ""))
 
         // The client cannot build the created row itself -- the id and `created` are stamped
         // server-side -- so addNote reads it back. That read is what retired NoteHandler.
@@ -422,7 +422,7 @@ class DefaultNoteRepositoryTest {
         stubCallable(callableResult(mapOf("documentPath" to NOTE_ID)))
         every { noteSnapshot.exists() } returns false
 
-        val result = repository.addNote(homeNote(favorite = false).copy(noteId = ""))
+        val result = repository.addNote(makeNote(isFavorite = false).copy(noteId = ""))
 
         // The note was created. Reporting a write that succeeded as an error because the follow-up
         // read failed would be worse than the note arriving on the next refresh.
@@ -434,7 +434,7 @@ class DefaultNoteRepositoryTest {
     fun `addNote logs when the function returns no document path`() = runTest(dispatcher) {
         stubCallable()
 
-        val result = repository.addNote(homeNote(favorite = false).copy(noteId = ""))
+        val result = repository.addNote(makeNote(isFavorite = false).copy(noteId = ""))
 
         assertTrue(result.isSuccess)
         coVerify(exactly = 0) { noteDao.upsertNotes(any()) }
@@ -449,15 +449,15 @@ class DefaultNoteRepositoryTest {
     }
 
     private fun favoriteRows() = listOf(
-        homeNote(favorite = true).copy(noteId = "a", text = "grocery list").toDatabaseNote(),
-        homeNote(favorite = true).copy(noteId = "b", text = "errands").toDatabaseNote(),
+        makeNote(isFavorite = true).copy(noteId = "a", text = "grocery list").toDatabaseNote(),
+        makeNote(isFavorite = true).copy(noteId = "b", text = "errands").toDatabaseNote(),
     )
 
-    private fun homeNote(favorite: Boolean) = HomeNote(
+    private fun makeNote(isFavorite: Boolean) = Note(
         noteId = NOTE_ID,
         text = "hello",
         createdDate = null,
-        favorite = favorite,
+        isFavorite = isFavorite,
         mediaList = null,
         username = "alice",
         profilePictureUrl = null,

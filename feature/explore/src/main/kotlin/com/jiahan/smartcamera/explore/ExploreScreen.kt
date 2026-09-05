@@ -77,23 +77,26 @@ fun ExploreScreen(
     onNavigateToPhotoPreview: (url: String) -> Unit,
     viewModel: ExploreViewModel = hiltViewModel(),
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
     val pullToRefreshState = rememberPullToRefreshState()
     val browseListState = rememberLazyListState()
     val searchListState = rememberLazyListState()
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val searchFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
+
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiState.isSearchActive) {
         if (uiState.isSearchActive) {
             searchFocusRequester.requestFocus()
         }
     }
+
     // Each new search submission (not load-more) replaces the result set entirely, so jump the
     // list back to the top rather than leaving it wherever the previous query's results scrolled to.
     LaunchedEffect(uiState.searchResultsVersion) {
         searchListState.scrollToItem(0)
     }
+
     BackHandler(enabled = uiState.isSearchActive) {
         viewModel.toggleSearch()
     }
@@ -122,7 +125,7 @@ fun ExploreScreen(
     }
     // displayedIsLoadingMore is a key for the same reason as HomeScreen's isLoadingMore: it is
     // read by the guard, so the effect has to re-run when it clears or the next page is never
-    // requested. Both loadMore* functions no-op once their hasMoreData is false, so this settles.
+    // requested. Both loadMore* functions no-op once their hasMore is false, so this settles.
     LaunchedEffect(
         shouldLoadMore,
         displayedIsLoadingMore,
@@ -246,7 +249,7 @@ fun ExploreScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     state = pullToRefreshState,
                                     isRefreshing = uiState.isRefreshing,
-                                    onRefresh = { viewModel.refresh() },
+                                    onRefresh = viewModel::refresh,
                                 ) {
                                     ExplorePhotoList(
                                         listState = browseListState,
@@ -354,7 +357,7 @@ private fun ExplorePhotoList(
             ExploreItem(
                 photo = photo,
                 modifier = Modifier.animateItem(),
-                onClick = { onNavigateToPhotoPreview(photo.imageUrl) },
+                onClick = { onNavigateToPhotoPreview(photo.photoUrl) },
                 onImageLoadError = onImageLoadError
             )
         }
@@ -446,7 +449,7 @@ private fun ExploreItem(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             ProfileAvatar(
-                profilePictureUrl = photo.userProfileImageUrl,
+                profilePictureUrl = photo.profilePictureUrl,
                 onImageLoadError = onImageLoadError,
                 size = 32.dp
             )
@@ -459,7 +462,7 @@ private fun ExploreItem(
         }
 
         AsyncImage(
-            model = photo.thumbUrl,
+            model = photo.thumbnailUrl,
             contentDescription = photo.description ?: stringResource(R.string.photo),
             contentScale = ContentScale.Crop,
             modifier = Modifier

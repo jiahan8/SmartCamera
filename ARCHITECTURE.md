@@ -100,7 +100,7 @@ code `:app` does not contain, and meant nothing below `:app` could assemble a re
 | UI | `<feature>/*Screen.kt` (`:feature:*`), `navigation/` (`:app`) | Render `UiState`, forward user intents. No Firebase/Room/DataStore calls, no business logic beyond UI-only state. |
 | ViewModel | `<feature>/*ViewModel.kt` (`:feature:*`) | `@HiltViewModel`, exposes a `*UiState` via `StateFlow` wrapping a nested sealed loading/loaded/error content type. Depends on repository *interfaces* only. |
 | Repository | interfaces in `:core:domain` (plus two in `:core:common`/`:core:data`), `Default*` implementations in `:core:data` | Coordinates remote (Firestore/Storage/Functions) and local (Room/DataStore). Exposes domain models only. Every fallible operation returns `Result<T>` via `safeCall`. |
-| Domain | `domain/` (`:core:domain`) | Plain data classes (`HomeNote`, `MediaDetail`, `User`, …). No Android plugin on the module, so `import android.*` cannot compile. |
+| Domain | `domain/` (`:core:domain`) | Plain data classes (`Note`, `MediaDetail`, `User`, …). No Android plugin on the module, so `import android.*` cannot compile. |
 | Local | `database/`, `data/datastore/` (`:core:data`) | The Room mirror and preferences. Schemas exported to `core/data/schemas/`. |
 | Remote | Firebase SDKs + `functions/index.js` | Auth, Firestore, Storage, Remote Config, Analytics, Crashlytics, FCM; Cloud Functions for anything needing a trusted server. |
 
@@ -153,7 +153,7 @@ This is the path that motivates having Cloud Functions at all:
 
 1. The app uploads media to Cloud Storage and writes a note document to Firestore under
    `user/{userId}/note/{noteId}` (`DefaultNoteRepository`), then writes it through to Room. The
-   upload runs in `viewModelScope` (`quickUploadMediaToFirebase`), so it is cancelled if the
+   upload runs in `viewModelScope` (`uploadMediaToCache`), so it is cancelled if the
    ViewModel is cleared mid-upload — official guidance for work that should survive that
    ([Guide to background work](https://developer.android.com/guide/background)) is `WorkManager`,
    which this codebase does not use today.
@@ -168,7 +168,7 @@ This is the path that motivates having Cloud Functions at all:
 The callable functions — `createNote`, `updateNote`, `isUsernameAvailable`, `isEmailRegistered`,
 `createUserProfile`, `updateUsername`, `recordUserActivity`, `listUnsplashPhotos`,
 `searchUnsplashPhotos` — exist because each needs a trusted environment: enforcing limits
-(`MAX_USERNAME_LENGTH`, `MAX_POST_TEXT_LENGTH`, `MAX_NOTE_MEDIA_ITEMS`, reserved-username checks) a
+(`MAX_USERNAME_LENGTH`, `MAX_NOTE_TEXT_LENGTH`, `MAX_NOTE_MEDIA_ITEMS`, reserved-username checks) a
 modified client can't be trusted to self-enforce, holding a secret (`UNSPLASH_ACCESS_KEY`, via
 `defineSecret`) that must never ship inside the APK, or — for `recordUserActivity` — needing a
 Firestore transaction to compute streak continuation atomically against another device's concurrent

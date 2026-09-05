@@ -83,17 +83,17 @@ fun NoteScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val scrollState = rememberScrollState()
 
-    val profilePicture by viewModel.profilePicture.collectAsStateWithLifecycle(null)
+    val profilePictureUrl by viewModel.profilePictureUrl.collectAsStateWithLifecycle(null)
     val username by viewModel.username.collectAsStateWithLifecycle("")
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val postText = uiState.postText
+    val noteText = uiState.noteText
     val photoUri = uiState.photoUri
     val videoUri = uiState.videoUri
     val mediaList = uiState.mediaList
     val uploadStatus = uiState.uploadStatus
     val isUploading = uploadStatus is UploadStatus.Uploading
-    val postTextError = uiState.postTextError
-    val postButtonEnabled by viewModel.postButtonEnabled.collectAsStateWithLifecycle()
+    val noteTextError = uiState.noteTextError
+    val saveButtonEnabled by viewModel.saveButtonEnabled.collectAsStateWithLifecycle()
 
     val (placeholder, placeholderAlpha) = rememberCyclingPlaceholder(
         options = listOf(
@@ -117,14 +117,14 @@ fun NoteScreen(
     val libraryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uriList ->
-        viewModel.updateUriList(uriList = uriList)
+        viewModel.addMedia(uriList = uriList)
     }
 
     val pictureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success) {
-            photoUri?.let { uri -> viewModel.updateUriList(uriList = listOf(uri)) }
+            photoUri?.let { uri -> viewModel.addMedia(uriList = listOf(uri)) }
         } else {
             photoUri?.let { uri -> viewModel.cancelPhotoCapture(uri) }
         }
@@ -134,7 +134,7 @@ fun NoteScreen(
         contract = ActivityResultContracts.CaptureVideo()
     ) { success ->
         if (success) {
-            videoUri?.let { uri -> viewModel.updateUriList(uriList = listOf(uri)) }
+            videoUri?.let { uri -> viewModel.addMedia(uriList = listOf(uri)) }
         } else {
             videoUri?.let { uri -> viewModel.cancelVideoCapture(uri) }
         }
@@ -145,7 +145,7 @@ fun NoteScreen(
     ) { isGranted ->
         hasCameraPermission = isGranted
         if (isGranted) {
-            val uri = viewModel.createImageUri()
+            val uri = viewModel.createPhotoUri()
             viewModel.updatePhotoUri(uri)
             uri?.let { pictureLauncher.launch(it) }
         }
@@ -166,14 +166,14 @@ fun NoteScreen(
         when (uploadStatus) {
             is UploadStatus.Success -> {
                 keyboardController?.hide()
-                viewModel.resetUploadState()
+                viewModel.resetUploadStatus()
                 onBack()
             }
 
             is UploadStatus.Error -> {
                 keyboardController?.hide()
                 snackbarHostState.showAppSnackbar(uploadStatus.message, isError = true)
-                viewModel.resetUploadState()
+                viewModel.resetUploadStatus()
             }
 
             else -> {}
@@ -210,9 +210,9 @@ fun NoteScreen(
                             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp)
                     ) {
                         ProfileAvatar(
-                            profilePictureUrl = profilePicture,
+                            profilePictureUrl = profilePictureUrl,
                             onImageLoadError = viewModel::logImageLoadError,
-                            onClick = profilePicture?.let { url ->
+                            onClick = profilePictureUrl?.let { url ->
                                 { onNavigateToPhotoPreview(url) }
                             }
                         )
@@ -228,8 +228,8 @@ fun NoteScreen(
                             )
 
                             BasicTextField(
-                                value = postText,
-                                onValueChange = { text -> viewModel.updatePostText(text) },
+                                value = noteText,
+                                onValueChange = { text -> viewModel.updateNoteText(text) },
                                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurface
                                 ),
@@ -244,7 +244,7 @@ fun NoteScreen(
                                     Row {
                                         Box(modifier = Modifier.weight(1f)) {
                                             innerTextField()
-                                            if (postText.isBlank()) {
+                                            if (noteText.isBlank()) {
                                                 Text(
                                                     text = placeholder,
                                                     style = MaterialTheme.typography.bodyMedium,
@@ -255,14 +255,14 @@ fun NoteScreen(
                                                 )
                                             }
                                         }
-                                        if (postText.isNotBlank() && !isUploading) {
+                                        if (noteText.isNotBlank() && !isUploading) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Clear,
                                                 contentDescription = stringResource(UiR.string.cd_clear_field),
                                                 modifier = Modifier
                                                     .padding(end = 12.dp)
                                                     .size(16.dp)
-                                                    .clickable { viewModel.updatePostText("") },
+                                                    .clickable { viewModel.updateNoteText("") },
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
@@ -274,11 +274,11 @@ fun NoteScreen(
                                 mediaList = mediaList,
                                 onPhotoClick = onNavigateToPhotoPreview,
                                 onVideoClick = onNavigateToVideoPreview,
-                                onRemoveMedia = { index -> viewModel.removeUriFromList(index) },
+                                onRemoveMedia = { index -> viewModel.removeMediaAt(index) },
                                 onImageLoadError = viewModel::logImageLoadError
                             )
 
-                            postTextError?.let { error ->
+                            noteTextError?.let { error ->
                                 Text(
                                     text = error,
                                     color = MaterialTheme.colorScheme.error,
@@ -288,7 +288,7 @@ fun NoteScreen(
 
                             NoteActionRow(
                                 isUploading = isUploading,
-                                postButtonEnabled = postButtonEnabled,
+                                saveButtonEnabled = saveButtonEnabled,
                                 onPickFromLibrary = {
                                     libraryLauncher.launch(
                                         PickVisualMediaRequest(PickVisualMedia.ImageAndVideo)
@@ -296,7 +296,7 @@ fun NoteScreen(
                                 },
                                 onTakePhoto = {
                                     if (hasCameraPermission) {
-                                        val uri = viewModel.createImageUri()
+                                        val uri = viewModel.createPhotoUri()
                                         viewModel.updatePhotoUri(uri)
                                         uri?.let { pictureLauncher.launch(it) }
                                     } else {
@@ -312,7 +312,7 @@ fun NoteScreen(
                                         videoCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                                     }
                                 },
-                                onSave = { viewModel.uploadPost() }
+                                onSave = viewModel::saveNote
                             )
                         }
                     }
@@ -408,7 +408,7 @@ private fun NoteMediaCarousel(
 @Composable
 private fun NoteActionRow(
     isUploading: Boolean,
-    postButtonEnabled: Boolean,
+    saveButtonEnabled: Boolean,
     onPickFromLibrary: () -> Unit,
     onTakePhoto: () -> Unit,
     onTakeVideo: () -> Unit,
@@ -455,7 +455,7 @@ private fun NoteActionRow(
 
         TextButton(
             onClick = onSave,
-            enabled = postButtonEnabled
+            enabled = saveButtonEnabled
         ) {
             Text(text = stringResource(R.string.save))
         }

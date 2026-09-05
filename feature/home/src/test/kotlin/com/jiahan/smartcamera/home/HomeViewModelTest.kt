@@ -3,7 +3,7 @@ package com.jiahan.smartcamera.home
 import app.cash.turbine.test
 import com.jiahan.smartcamera.MainDispatcherRule
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.domain.NoteCursor
 import com.jiahan.smartcamera.domain.NotePage
 import com.jiahan.smartcamera.fake.FakeRemoteConfigRepository
@@ -61,7 +61,7 @@ class HomeViewModelTest {
      * so a test drives the UI by what lands here -- whether that is a mirrored page, a mutation
      * writing through, or another screen's write arriving underneath Home.
      */
-    private val notesMirror = MutableStateFlow<List<HomeNote>>(emptyList())
+    private val notesMirror = MutableStateFlow<List<Note>>(emptyList())
 
     @Before
     fun setUp() {
@@ -90,11 +90,11 @@ class HomeViewModelTest {
      * digits (`fresh`, `added`) is newest of all. That is what lets [mirror] sort the way the table
      * does, which matters once the feed reads a windowed `LIMIT` rather than everything.
      */
-    private fun makeNote(id: String, favorite: Boolean = false) = HomeNote(
+    private fun makeNote(id: String, isFavorite: Boolean = false) = Note(
         noteId = id,
         text = "Note $id",
         username = "testUser",
-        favorite = favorite,
+        isFavorite = isFavorite,
         createdDate = Instant.fromEpochMilliseconds(
             BASE_TIME_MS - (id.takeLastWhile { it.isDigit() }.toLongOrNull() ?: 0L) * 1_000L
         )
@@ -105,7 +105,7 @@ class HomeViewModelTest {
      * id, appended in page order. Note that nothing is ever removed -- the table is not reconciled
      * against the server, so a reload adds to the mirror rather than replacing it.
      */
-    private fun mirror(page: List<HomeNote>) {
+    private fun mirror(page: List<Note>) {
         notesMirror.update { existing ->
             val refreshed = existing.map { old ->
                 page.firstOrNull { it.noteId == old.noteId } ?: old
@@ -118,7 +118,7 @@ class HomeViewModelTest {
     /** Stubs the page fetched at [cursor], mirroring it on the way out as the real fetch does. */
     private fun stubPage(
         cursor: NoteCursor?,
-        notes: List<HomeNote>,
+        notes: List<Note>,
         nextCursor: NoteCursor? = null
     ) {
         coEvery { noteRepository.getNotes(cursor, any()) } coAnswers {
@@ -128,7 +128,7 @@ class HomeViewModelTest {
     }
 
     /** As [stubPage], for any cursor. */
-    private fun stubAnyPage(notes: List<HomeNote>, nextCursor: NoteCursor? = null) {
+    private fun stubAnyPage(notes: List<Note>, nextCursor: NoteCursor? = null) {
         coEvery { noteRepository.getNotes(any(), any()) } coAnswers {
             mirror(notes)
             Result.success(NotePage(notes, nextCursor))
@@ -154,7 +154,7 @@ class HomeViewModelTest {
         return viewModel
     }
 
-    private fun HomeViewModel.notes(): List<HomeNote> =
+    private fun HomeViewModel.notes(): List<Note> =
         (content.value as HomeContent.Success).notes
 
     private companion object {
@@ -336,7 +336,7 @@ class HomeViewModelTest {
         // Reset recorded calls (keep stubs) so we measure only what loadMoreNotes triggers
         clearMocks(noteRepository, answers = false)
 
-        viewModel.loadMoreNotes() // hasMoreData = false → should be a no-op
+        viewModel.loadMoreNotes() // hasMore = false → should be a no-op
 
         coVerify(exactly = 0) { noteRepository.getNotes(any(), any()) }
     }
@@ -534,50 +534,50 @@ class HomeViewModelTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `favoriteNote toggle reaches the feed through the mirror`() = runTest {
-        stubPage(null, listOf(makeNote("doc1", favorite = false)))
-        val note = makeNote("doc1", favorite = false)
-        coEvery { noteRepository.favoriteNote(note) } coAnswers {
+    fun `toggleFavorite reaches the feed through the mirror`() = runTest {
+        stubPage(null, listOf(makeNote("doc1", isFavorite = false)))
+        val note = makeNote("doc1", isFavorite = false)
+        coEvery { noteRepository.toggleFavorite(note) } coAnswers {
             // The repository upserts the flipped row; nothing here patches the list.
             notesMirror.update { notes ->
-                notes.map { if (it.noteId == "doc1") it.copy(favorite = true) else it }
+                notes.map { if (it.noteId == "doc1") it.copy(isFavorite = true) else it }
             }
             Result.success(Unit)
         }
         val viewModel = homeViewModel()
 
-        viewModel.favoriteNote(note)
+        viewModel.toggleFavorite(note)
 
-        assertTrue(viewModel.notes().single().favorite) // false → true
+        assertTrue(viewModel.notes().single().isFavorite) // false → true
     }
 
     @Test
-    fun `favoriteNote unfavoriting reaches the feed the same way`() = runTest {
-        stubPage(null, listOf(makeNote("doc1", favorite = true)))
-        val note = makeNote("doc1", favorite = true)
-        coEvery { noteRepository.favoriteNote(note) } coAnswers {
+    fun `toggleFavorite unfavoriting reaches the feed the same way`() = runTest {
+        stubPage(null, listOf(makeNote("doc1", isFavorite = true)))
+        val note = makeNote("doc1", isFavorite = true)
+        coEvery { noteRepository.toggleFavorite(note) } coAnswers {
             notesMirror.update { notes ->
-                notes.map { if (it.noteId == "doc1") it.copy(favorite = false) else it }
+                notes.map { if (it.noteId == "doc1") it.copy(isFavorite = false) else it }
             }
             Result.success(Unit)
         }
         val viewModel = homeViewModel()
 
-        viewModel.favoriteNote(note)
+        viewModel.toggleFavorite(note)
 
         // The row stays in the table either way -- that is the distinction the feed's query draws
         // and the favorites query does not.
-        assertFalse(viewModel.notes().single().favorite) // true → false
+        assertFalse(viewModel.notes().single().isFavorite) // true → false
     }
 
     @Test
-    fun `favoriteNote failure emits action error`() = runTest {
-        coEvery { noteRepository.favoriteNote(any()) } returns Result.failure(RuntimeException())
+    fun `toggleFavorite failure emits action error`() = runTest {
+        coEvery { noteRepository.toggleFavorite(any()) } returns Result.failure(RuntimeException())
         every { errorHandler.getErrorMessage(any()) } returns "fav error"
         val viewModel = homeViewModel()
 
         viewModel.actionError.test {
-            viewModel.favoriteNote(makeNote("doc1"))
+            viewModel.toggleFavorite(makeNote("doc1"))
             assertEquals("fav error", awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
@@ -624,15 +624,15 @@ class HomeViewModelTest {
 
     @Test
     fun `a favorite toggled on another screen reaches the feed`() = runTest {
-        stubPage(null, listOf(makeNote("doc1", favorite = false), makeNote("doc2")))
+        stubPage(null, listOf(makeNote("doc1", isFavorite = false), makeNote("doc2")))
         val viewModel = homeViewModel()
 
         notesMirror.update { notes ->
-            notes.map { if (it.noteId == "doc1") it.copy(favorite = true) else it }
+            notes.map { if (it.noteId == "doc1") it.copy(isFavorite = true) else it }
         }
 
-        assertTrue(viewModel.notes().first { it.noteId == "doc1" }.favorite)
-        assertFalse(viewModel.notes().first { it.noteId == "doc2" }.favorite)
+        assertTrue(viewModel.notes().first { it.noteId == "doc1" }.isFavorite)
+        assertFalse(viewModel.notes().first { it.noteId == "doc2" }.isFavorite)
     }
 
     @Test

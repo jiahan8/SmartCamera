@@ -14,20 +14,20 @@ class FakeUserPreferencesRepository(
     initial: UserPreferences = UserPreferences(
         isDarkTheme = false,
         username = "",
-        profilePicture = null
+        profilePictureUrl = null
     )
 ) : UserPreferencesRepository {
 
     private val _preferences = MutableStateFlow(initial)
-    override val userPreferencesFlow: Flow<UserPreferences> = _preferences.asStateFlow()
+    override val userPreferences: Flow<UserPreferences> = _preferences.asStateFlow()
 
-    var updateDarkThemeResult: Result<Unit> = Result.success(Unit)
+    var setDarkThemeResult: Result<Unit> = Result.success(Unit)
 
-    override suspend fun updateDarkThemeVisibility(isDarkTheme: Boolean): Result<Unit> {
-        if (updateDarkThemeResult.isSuccess) {
-            _preferences.value = _preferences.value.copy(isDarkTheme = isDarkTheme)
+    override suspend fun setDarkTheme(enabled: Boolean): Result<Unit> {
+        if (setDarkThemeResult.isSuccess) {
+            _preferences.value = _preferences.value.copy(isDarkTheme = enabled)
         }
-        return updateDarkThemeResult
+        return setDarkThemeResult
     }
 
     override suspend fun updateLocalUserProfile(
@@ -36,7 +36,7 @@ class FakeUserPreferencesRepository(
     ): Result<Unit> {
         _preferences.value = _preferences.value.copy(
             username = username,
-            profilePicture = profilePictureUrl
+            profilePictureUrl = profilePictureUrl
         )
         return Result.success(Unit)
     }

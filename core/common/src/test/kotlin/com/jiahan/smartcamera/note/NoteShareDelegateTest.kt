@@ -3,8 +3,8 @@ package com.jiahan.smartcamera.note
 import android.net.Uri
 import app.cash.turbine.test
 import com.jiahan.smartcamera.data.repository.MediaFileRepository
-import com.jiahan.smartcamera.domain.HomeNote
 import com.jiahan.smartcamera.domain.MediaDetail
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.util.ErrorHandler
 import com.jiahan.smartcamera.util.ResourceProvider
 import io.mockk.coEvery
@@ -36,7 +36,7 @@ class NoteShareDelegateTest {
         NoteShareDelegate(mediaFileRepository, noteErrorReporter, resourceProvider)
 
     private fun note(text: String? = "a note", media: List<MediaDetail>? = null) =
-        HomeNote(noteId = "n1", text = text, username = "tester", mediaList = media)
+        Note(noteId = "n1", text = text, username = "tester", mediaList = media)
 
     private fun photo(url: String) = MediaDetail(photoUrl = url, isVideo = false)
     private fun video(url: String) = MediaDetail(videoUrl = url, isVideo = true)

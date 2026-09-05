@@ -54,7 +54,7 @@ class ProfileViewModelTest {
         metadata = "",
         displayName = "Test User",
         username = "testuser",
-        profilePicture = null,
+        profilePictureUrl = null,
         createdDate = Clock.System.now(),
     )
 
@@ -65,13 +65,13 @@ class ProfileViewModelTest {
         every { errorHandler.logError(any()) } just runs
         every { errorHandler.getErrorMessage(any()) } returns "Error"
         every { resourceProvider.getString(any()) } returns "Validation error"
-        every { analyticsRepository.logDisplayNameCustomEvent(any()) } just runs
-        every { analyticsRepository.logUsernameCustomEvent(any()) } just runs
+        every { analyticsRepository.logDisplayName(any()) } just runs
+        every { analyticsRepository.logUsername(any()) } just runs
         coEvery { userRepository.getUser() } returns Result.success(testUser)
         coEvery {
             userPreferencesRepository.updateLocalUserProfile(any(), any())
         } returns Result.success(Unit)
-        coEvery { noteRepository.quickUploadMediaToFirebase(any(), any()) } returns Unit
+        coEvery { noteRepository.uploadMediaToCache(any(), any()) } returns Unit
         viewModel = ProfileViewModel(
             userRepository, authRepository, userPreferencesRepository,
             mediaFileRepository, noteRepository, analyticsRepository, resourceProvider,
@@ -112,8 +112,8 @@ class ProfileViewModelTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `updateDisplayNameText valid value clears error and marks form changed`() = runTest {
-        viewModel.updateDisplayNameText("New Name")
+    fun `updateDisplayName valid value clears error and marks form changed`() = runTest {
+        viewModel.updateDisplayName("New Name")
 
         assertEquals("New Name", viewModel.uiState.value.displayName)
         assertNull(viewModel.uiState.value.displayNameErrorMessage)
@@ -121,39 +121,39 @@ class ProfileViewModelTest {
     }
 
     @Test
-    fun `updateDisplayNameText blank value sets displayNameError`() = runTest {
-        viewModel.updateDisplayNameText("  ")
+    fun `updateDisplayName blank value sets displayNameError`() = runTest {
+        viewModel.updateDisplayName("  ")
 
         assertNotNull(viewModel.uiState.value.displayNameErrorMessage)
     }
 
     @Test
-    fun `updateUsernameText valid value clears error`() = runTest {
-        viewModel.updateUsernameText("newuser")
+    fun `updateUsername valid value clears error`() = runTest {
+        viewModel.updateUsername("newuser")
 
         assertEquals("newuser", viewModel.uiState.value.username)
         assertNull(viewModel.uiState.value.usernameErrorMessage)
     }
 
     @Test
-    fun `updateUsernameText with invalid characters sets usernameError`() = runTest {
-        viewModel.updateUsernameText("bad user!")
+    fun `updateUsername with invalid characters sets usernameError`() = runTest {
+        viewModel.updateUsername("bad user!")
 
         assertNotNull(viewModel.uiState.value.usernameErrorMessage)
     }
 
     @Test
-    fun `updateDisplayNameText logs analytics event`() = runTest {
-        viewModel.updateDisplayNameText("New Name")
+    fun `updateDisplayName logs analytics event`() = runTest {
+        viewModel.updateDisplayName("New Name")
 
-        verify { analyticsRepository.logDisplayNameCustomEvent("New Name") }
+        verify { analyticsRepository.logDisplayName("New Name") }
     }
 
     @Test
-    fun `updateUsernameText logs analytics event`() = runTest {
-        viewModel.updateUsernameText("newuser")
+    fun `updateUsername logs analytics event`() = runTest {
+        viewModel.updateUsername("newuser")
 
-        verify { analyticsRepository.logUsernameCustomEvent("newuser") }
+        verify { analyticsRepository.logUsername("newuser") }
     }
 
     // -------------------------------------------------------------------------
@@ -175,11 +175,11 @@ class ProfileViewModelTest {
 
     @Test
     fun `updateUserProfile success emits UpdateSuccess event`() = runTest {
-        viewModel.updateDisplayNameText("Updated Name")
+        viewModel.updateDisplayName("Updated Name")
         coEvery { userRepository.updateUserProfile(any(), any(), any()) } returns
                 Result.success(Unit)
 
-        viewModel.events.test {
+        viewModel.profileEvent.test {
             viewModel.updateUserProfile()
             assertEquals(ProfileEvent.UpdateSuccess, awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -188,7 +188,7 @@ class ProfileViewModelTest {
 
     @Test
     fun `updateUserProfile username changed checks availability`() = runTest {
-        viewModel.updateUsernameText("brandnew")
+        viewModel.updateUsername("brandnew")
         coEvery { authRepository.isUsernameAvailable("brandnew") } returns Result.success(true)
         coEvery { userRepository.updateUserProfile(any(), any(), any()) } returns
                 Result.success(Unit)
@@ -199,7 +199,7 @@ class ProfileViewModelTest {
 
     @Test
     fun `updateUserProfile username not available sets error and stops`() = runTest {
-        viewModel.updateUsernameText("taken")
+        viewModel.updateUsername("taken")
         coEvery { authRepository.isUsernameAvailable("taken") } returns Result.success(false)
 
         viewModel.updateUserProfile()
@@ -210,13 +210,13 @@ class ProfileViewModelTest {
     @Test
     fun `updateUserProfile isUsernameAvailable failure sets errorMessage and emits UpdateError`() =
         runTest {
-            viewModel.updateUsernameText("newname")
+            viewModel.updateUsername("newname")
             val exception = RuntimeException("network down")
             coEvery { authRepository.isUsernameAvailable("newname") } returns
                     Result.failure(exception)
             every { errorHandler.getErrorMessage(exception) } returns "network down"
 
-            viewModel.events.test {
+            viewModel.profileEvent.test {
                 viewModel.updateUserProfile()
                 assertEquals(ProfileEvent.UpdateError(), awaitItem())
                 cancelAndIgnoreRemainingEvents()
@@ -229,13 +229,13 @@ class ProfileViewModelTest {
     @Test
     fun `updateUserProfile repository failure sets errorMessage and emits UpdateError`() =
         runTest {
-            viewModel.updateDisplayNameText("Updated Name")
+            viewModel.updateDisplayName("Updated Name")
             val exception = RuntimeException("boom")
             coEvery { userRepository.updateUserProfile(any(), any(), any()) } returns
                     Result.failure(exception)
             every { errorHandler.getErrorMessage(exception) } returns "boom"
 
-            viewModel.events.test {
+            viewModel.profileEvent.test {
                 viewModel.updateUserProfile()
                 assertEquals(ProfileEvent.UpdateError(), awaitItem())
                 cancelAndIgnoreRemainingEvents()
@@ -263,11 +263,11 @@ class ProfileViewModelTest {
     }
 
     @Test
-    fun `updateBottomSheetVisibility updates state`() {
-        viewModel.updateBottomSheetVisibility(true)
-        assertTrue(viewModel.uiState.value.showBottomSheet)
-        viewModel.updateBottomSheetVisibility(false)
-        assertFalse(viewModel.uiState.value.showBottomSheet)
+    fun `showBottomSheet and dismissBottomSheet update state`() {
+        viewModel.showBottomSheet()
+        assertTrue(viewModel.uiState.value.isBottomSheetVisible)
+        viewModel.dismissBottomSheet()
+        assertFalse(viewModel.uiState.value.isBottomSheetVisible)
     }
 
     /**
@@ -295,7 +295,7 @@ class ProfileViewModelTest {
         viewModel.updatePhotoUri(uri)           // establish a non-null state first
         assertEquals(uri, viewModel.uiState.value.photoUri) // precondition
         viewModel.cancelPhotoCapture(uri)
-        coVerify { noteRepository.quickUploadMediaToFirebase(listOf(mediaUri), true) }
+        coVerify { noteRepository.uploadMediaToCache(listOf(mediaUri), true) }
         assertNull(viewModel.uiState.value.photoUri)
     }
 
@@ -309,13 +309,13 @@ class ProfileViewModelTest {
 
         viewModel.uploadProfilePicture(uri)
 
-        coVerify { noteRepository.quickUploadMediaToFirebase(listOf(mediaUri), false) }
+        coVerify { noteRepository.uploadMediaToCache(listOf(mediaUri), false) }
     }
 
     @Test
-    fun `uploadProfilePicture success updates profile and emits UploadSuccess`() = runTest {
+    fun `uploadProfilePicture success updates profile and emits PictureChanged`() = runTest {
         val (uri, mediaUri) = fakeUri("content://media/profile")
-        viewModel.updateBottomSheetVisibility(true)
+        viewModel.showBottomSheet()
         coEvery { userRepository.uploadProfilePicture(mediaUri) } returns
                 Result.success("https://example.com/pic.jpg")
         coEvery {
@@ -329,14 +329,14 @@ class ProfileViewModelTest {
             )
         } returns Result.success(Unit)
 
-        viewModel.events.test {
+        viewModel.profileEvent.test {
             viewModel.uploadProfilePicture(uri)
-            assertEquals(ProfileEvent.UploadSuccess, awaitItem())
+            assertEquals(ProfileEvent.PictureChanged, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
         coVerify(exactly = 2) { userRepository.getUser() } // init load + reload after success
         assertFalse(viewModel.uiState.value.isUploading)
-        assertFalse(viewModel.uiState.value.showBottomSheet)
+        assertFalse(viewModel.uiState.value.isBottomSheetVisible)
     }
 
     @Test
@@ -345,7 +345,7 @@ class ProfileViewModelTest {
             val (uri, mediaUri) = fakeUri("content://media/profile")
             coEvery { userRepository.uploadProfilePicture(mediaUri) } returns Result.success(null)
 
-            viewModel.events.test {
+            viewModel.profileEvent.test {
                 viewModel.uploadProfilePicture(uri)
                 assertEquals(ProfileEvent.UpdateError(), awaitItem())
                 cancelAndIgnoreRemainingEvents()
@@ -361,7 +361,7 @@ class ProfileViewModelTest {
         coEvery { userRepository.uploadProfilePicture(mediaUri) } returns Result.failure(exception)
         every { errorHandler.getErrorMessage(exception) } returns "upload failed"
 
-        viewModel.events.test {
+        viewModel.profileEvent.test {
             viewModel.uploadProfilePicture(uri)
             assertEquals(ProfileEvent.UpdateError("upload failed"), awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -380,7 +380,7 @@ class ProfileViewModelTest {
                     Result.failure(exception)
             every { errorHandler.getErrorMessage(exception) } returns "save failed"
 
-            viewModel.events.test {
+            viewModel.profileEvent.test {
                 viewModel.uploadProfilePicture(uri)
                 assertEquals(ProfileEvent.UpdateError("save failed"), awaitItem())
                 cancelAndIgnoreRemainingEvents()
@@ -393,8 +393,8 @@ class ProfileViewModelTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `deleteProfilePicture success updates profile and emits UploadSuccess`() = runTest {
-        viewModel.updateBottomSheetVisibility(true)
+    fun `deleteProfilePicture success updates profile and emits PictureChanged`() = runTest {
+        viewModel.showBottomSheet()
         coEvery {
             userRepository.updateUserProfile(
                 displayName = null,
@@ -403,14 +403,14 @@ class ProfileViewModelTest {
             )
         } returns Result.success(Unit)
 
-        viewModel.events.test {
+        viewModel.profileEvent.test {
             viewModel.deleteProfilePicture()
-            assertEquals(ProfileEvent.UploadSuccess, awaitItem())
+            assertEquals(ProfileEvent.PictureChanged, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
         coVerify(exactly = 2) { userRepository.getUser() } // init load + reload after success
         assertFalse(viewModel.uiState.value.isUploading)
-        assertFalse(viewModel.uiState.value.showBottomSheet)
+        assertFalse(viewModel.uiState.value.isBottomSheetVisible)
     }
 
     @Test
@@ -420,7 +420,7 @@ class ProfileViewModelTest {
                 Result.failure(exception)
         every { errorHandler.getErrorMessage(exception) } returns "delete failed"
 
-        viewModel.events.test {
+        viewModel.profileEvent.test {
             viewModel.deleteProfilePicture()
             assertEquals(ProfileEvent.UpdateError("delete failed"), awaitItem())
             cancelAndIgnoreRemainingEvents()

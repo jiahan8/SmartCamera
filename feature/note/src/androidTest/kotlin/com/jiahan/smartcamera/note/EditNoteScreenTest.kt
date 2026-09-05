@@ -23,12 +23,12 @@ import androidx.lifecycle.SavedStateHandle
 import com.jiahan.smartcamera.feature.note.R
 import com.jiahan.smartcamera.core.common.R as CommonR
 import com.jiahan.smartcamera.core.ui.R as UiR
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.fake.FakeAnalyticsRepository
 import com.jiahan.smartcamera.fake.FakeErrorHandler
 import com.jiahan.smartcamera.fake.FakeNoteRepository
 import com.jiahan.smartcamera.fake.FakeResourceProvider
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -64,7 +64,7 @@ class EditNoteScreenTest {
     private var navigatedToPhotoPreviewUrl: String? = null
     private var navigatedToVideoPreviewUrl: String? = null
 
-    private fun note(noteId: String = "note1", text: String? = "Original text") = HomeNote(
+    private fun note(noteId: String = "note1", text: String? = "Original text") = Note(
         noteId = noteId,
         text = text,
         username = "tester",
@@ -80,7 +80,7 @@ class EditNoteScreenTest {
             errorHandler = errorHandler,
         )
         composeTestRule.setContent {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 EditNoteScreen(
                     onBack = { navigatedBack = true },
                     onNavigateToPhotoPreview = { navigatedToPhotoPreviewUrl = it },

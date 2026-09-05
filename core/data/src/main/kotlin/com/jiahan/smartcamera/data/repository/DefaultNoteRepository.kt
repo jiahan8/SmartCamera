@@ -13,13 +13,13 @@ import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.storage
 import com.jiahan.smartcamera.database.dao.NoteDao
 import com.jiahan.smartcamera.database.data.toDatabaseNote
-import com.jiahan.smartcamera.database.data.toHomeNote
+import com.jiahan.smartcamera.database.data.toNote
 import com.jiahan.smartcamera.domain.AppError
 import com.jiahan.smartcamera.domain.DetectedLabel
 import com.jiahan.smartcamera.domain.DetectedObject
-import com.jiahan.smartcamera.domain.HomeNote
 import com.jiahan.smartcamera.domain.MediaDetail
 import com.jiahan.smartcamera.domain.MediaUri
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.domain.NoteCursor
 import com.jiahan.smartcamera.domain.NoteMediaDetail
 import com.jiahan.smartcamera.domain.NotePage
@@ -150,13 +150,13 @@ class DefaultNoteRepository @Inject constructor(
             }
 
             val userIds = snapshot.documents.mapNotNull { it.getString(FIELD_USER_ID) }.distinct()
-            val userDocumentsMap = getUserDocumentsInBatch(userIds)
+            val userDocumentsMap = fetchUserDocuments(userIds)
             val notes = snapshot.documents.mapNotNull { document ->
                 val userId = document.getString(FIELD_USER_ID) ?: return@mapNotNull null
-                userDocumentsMap[userId]?.let { getHomeNote(document, it) }
+                userDocumentsMap[userId]?.let { buildNote(document, it) }
             }
             // The cursor comes from the documents the query returned, not from the mapped
-            // notes: getUserDocumentsInBatch tolerates a failed author lookup by dropping that
+            // notes: fetchUserDocuments tolerates a failed author lookup by dropping that
             // note, so a short mapped list would otherwise be read as "end of feed".
             val lastDocument = snapshot.documents
                 .takeIf { it.size >= pageSize }
@@ -170,10 +170,10 @@ class DefaultNoteRepository @Inject constructor(
     }
 
     // Delegates to the createNote Cloud Function, which enforces
-    // MAX_POST_TEXT_LENGTH and stamps the true owner into user_id server-side
+    // MAX_NOTE_TEXT_LENGTH and stamps the true owner into user_id server-side
     // instead of trusting a client-supplied value.
-    override suspend fun addNote(homeNote: HomeNote): Result<Unit> = safeCall {
-        val mediaListPayload = homeNote.mediaList.orEmpty().map { media ->
+    override suspend fun addNote(note: Note): Result<Unit> = safeCall {
+        val mediaListPayload = note.mediaList.orEmpty().map { media ->
             hashMapOf(
                 ARG_PHOTO_URL to media.photoUrl,
                 ARG_VIDEO_URL to media.videoUrl,
@@ -182,7 +182,7 @@ class DefaultNoteRepository @Inject constructor(
             )
         }
         val response = functions.getHttpsCallable(FUNCTION_CREATE_NOTE)
-            .call(hashMapOf(ARG_TEXT to homeNote.text, ARG_MEDIA_LIST to mediaListPayload))
+            .call(hashMapOf(ARG_TEXT to note.text, ARG_MEDIA_LIST to mediaListPayload))
             .await()
 
         mirrorCreatedNote(response)
@@ -190,34 +190,34 @@ class DefaultNoteRepository @Inject constructor(
 
     // Delegates to the updateNote Cloud Function for the same reason addNote
     // delegates to createNote: server-side validation and ownership checks a
-    // direct client-side Firestore update couldn't do. Only [homeNote]'s text
+    // direct client-side Firestore update couldn't do. Only [note]'s text
     // is sent -- a note's media is fixed at creation time -- but the whole note
     // is taken so the local mirror can be refreshed with it below.
-    override suspend fun updateNote(homeNote: HomeNote): Result<Unit> = safeCall {
+    override suspend fun updateNote(note: Note): Result<Unit> = safeCall {
         functions.getHttpsCallable(FUNCTION_UPDATE_NOTE)
-            .call(hashMapOf(ARG_NOTE_ID to homeNote.noteId, ARG_TEXT to homeNote.text))
+            .call(hashMapOf(ARG_NOTE_ID to note.noteId, ARG_TEXT to note.text))
             .await()
-        // Unconditional: this write used to be gated on `homeNote.favorite`, back when the table
+        // Unconditional: this write used to be gated on `note.isFavorite`, back when the table
         // held favorites only. It mirrors the whole feed now, so an edit to any note has to land.
-        noteDao.upsertNotes(listOf(homeNote.toDatabaseNote()))
+        noteDao.upsertNotes(listOf(note.toDatabaseNote()))
     }.foldNoteValidationError()
 
     // Reads the whole collection and filters client-side, which is what it has always done. What
     // changed is where the result goes: it is mirrored on the way out, so searchNotesStream covers
     // notes the feed never paged rather than narrowing search to what Home has scrolled.
-    override suspend fun searchNotes(query: String): Result<List<HomeNote>> = safeCall {
+    override suspend fun searchNotes(query: String): Result<List<Note>> = safeCall {
         noteCollectionReference?.let { ref ->
             val snapshot = ref
                 .orderBy(FIELD_CREATED, Query.Direction.DESCENDING)
                 .get()
                 .await()
             val userIds = snapshot.documents.mapNotNull { it.getString(FIELD_USER_ID) }.distinct()
-            val userDocumentsMap = getUserDocumentsInBatch(userIds)
+            val userDocumentsMap = fetchUserDocuments(userIds)
             val results = snapshot.documents
                 .filter { document -> matchesSearchQuery(document, query) }
                 .mapNotNull { document ->
                     val userId = document.getString(FIELD_USER_ID) ?: return@mapNotNull null
-                    userDocumentsMap[userId]?.let { getHomeNote(document, it) }
+                    userDocumentsMap[userId]?.let { buildNote(document, it) }
                 }
             cacheNotes(results)
             results
@@ -229,9 +229,9 @@ class DefaultNoteRepository @Inject constructor(
         noteDao.deleteNote(noteId)
     }
 
-    override suspend fun favoriteNote(homeNote: HomeNote): Result<Unit> = safeCall {
-        val newFavoriteStatus = homeNote.favorite.not()
-        noteCollectionReference?.document(homeNote.noteId)
+    override suspend fun toggleFavorite(note: Note): Result<Unit> = safeCall {
+        val newFavoriteStatus = note.isFavorite.not()
+        noteCollectionReference?.document(note.noteId)
             ?.update(FIELD_FAVORITE, newFavoriteStatus)?.await()
         // One upsert for both directions. Unfavoriting used to delete the row, which was right
         // when the table was a favorites-only cache and wrong now that it mirrors the feed -- the
@@ -240,11 +240,11 @@ class DefaultNoteRepository @Inject constructor(
         // from a screen that never paged it in, and an UPDATE against a missing row is a silent
         // no-op that would lose it from Favorite.
         noteDao.upsertNotes(
-            listOf(homeNote.copy(favorite = newFavoriteStatus).toDatabaseNote())
+            listOf(note.copy(isFavorite = newFavoriteStatus).toDatabaseNote())
         )
     }
 
-    override suspend fun getNote(noteId: String): Result<HomeNote> = safeCall {
+    override suspend fun getNote(noteId: String): Result<Note> = safeCall {
         noteCollectionReference?.let { ref ->
             val noteDocument = ref.document(noteId).get().await()
             if (!noteDocument.exists()) throw AppError.NoteUnavailable()
@@ -252,11 +252,11 @@ class DefaultNoteRepository @Inject constructor(
                 ?: throw AppError.NoteUnavailable()
             val userDocument = getUserDocumentSnapshot(userId)
             if (!userDocument.exists()) throw AppError.NoteUnavailable()
-            getHomeNote(noteDocument, userDocument).also { cacheNotes(listOf(it)) }
+            buildNote(noteDocument, userDocument).also { cacheNotes(listOf(it)) }
         } ?: throw AppError.NotAuthenticated()
     }
 
-    override suspend fun uploadMediaToFirebase(
+    override suspend fun uploadMedia(
         noteMediaDetailList: List<NoteMediaDetail>
     ): Result<List<MediaDetail>> = safeCall {
         val userId = authRepository.currentUserId
@@ -299,7 +299,7 @@ class DefaultNoteRepository @Inject constructor(
                             thumbnailUrl = thumbnailUrl,
                             isVideo = noteMediaDetail.isVideo
                         )
-                    }.onFailure { e -> errorHandler.logError(e) }.getOrNull()
+                    }.onFailure(errorHandler::logError).getOrNull()
                 }
             }.awaitAll().filterNotNull()
         }
@@ -323,7 +323,7 @@ class DefaultNoteRepository @Inject constructor(
             errorHandler.logError(AppError.NoteUnavailable())
             return
         }
-        getNote(noteId).onFailure { e -> errorHandler.logError(e) }
+        getNote(noteId).onFailure(errorHandler::logError)
     }
 
     /**
@@ -359,7 +359,7 @@ class DefaultNoteRepository @Inject constructor(
      * permanent hole in the feed. Failing the enclosing [safeCall] leaves the cursor where it was,
      * so the page is retried instead.
      */
-    private suspend fun cacheNotes(notes: List<HomeNote>) {
+    private suspend fun cacheNotes(notes: List<Note>) {
         if (notes.isEmpty()) return
         noteDao.upsertNotes(notes.map { it.toDatabaseNote() })
     }
@@ -392,12 +392,12 @@ class DefaultNoteRepository @Inject constructor(
                             thumbnailUri = thumbnailUri,
                             isVideo = isVideo
                         )
-                    }.onFailure { e -> errorHandler.logError(e) }.getOrNull()
+                    }.onFailure(errorHandler::logError).getOrNull()
                 }
             }
         }
 
-    override suspend fun quickUploadMediaToFirebase(
+    override suspend fun uploadMediaToCache(
         uriList: List<MediaUri>,
         deleteAfterUpload: Boolean
     ) {
@@ -412,9 +412,9 @@ class DefaultNoteRepository @Inject constructor(
                             userScopedPath(cacheStorageFolder, userId, mediaId)
                         )
                         storageRef.putFile(uri).await()
-                    }.onFailure { e -> errorHandler.logError(e) }
+                    }.onFailure(errorHandler::logError)
                 }
-                if (deleteAfterUpload) mediaFileRepository.deleteUri(uri)
+                if (deleteAfterUpload) mediaFileRepository.deleteFile(uri)
             }
         }
     }
@@ -426,7 +426,7 @@ class DefaultNoteRepository @Inject constructor(
      * Fetches user documents in parallel.
      * A single failed lookup is logged and skipped (partial-result tolerance).
      */
-    private suspend fun getUserDocumentsInBatch(
+    private suspend fun fetchUserDocuments(
         userIds: List<String>
     ): Map<String, DocumentSnapshot> {
         if (userIds.isEmpty()) return emptyMap()
@@ -434,14 +434,14 @@ class DefaultNoteRepository @Inject constructor(
             userIds.map { userId ->
                 async {
                     safeCall { userId to getUserDocumentSnapshot(userId) }
-                        .onFailure { e -> errorHandler.logError(e) }
+                        .onFailure(errorHandler::logError)
                         .getOrNull()
                 }
             }.awaitAll().filterNotNull().toMap()
         }
     }
 
-    private suspend fun fetchAllFavoritesFromFirestore(): List<HomeNote> {
+    private suspend fun fetchAllFavoritesFromFirestore(): List<Note> {
         noteCollectionReference?.let { ref ->
             val snapshot = ref
                 .whereEqualTo(FIELD_FAVORITE, true)
@@ -449,45 +449,45 @@ class DefaultNoteRepository @Inject constructor(
                 .get()
                 .await()
             val userIds = snapshot.documents.mapNotNull { it.getString(FIELD_USER_ID) }.distinct()
-            val userDocumentsMap = getUserDocumentsInBatch(userIds)
+            val userDocumentsMap = fetchUserDocuments(userIds)
             return snapshot.documents.mapNotNull { document ->
                 val userId = document.getString(FIELD_USER_ID) ?: return@mapNotNull null
                 val userDocument = userDocumentsMap[userId] ?: return@mapNotNull null
-                getHomeNote(document, userDocument)
+                buildNote(document, userDocument)
             }
         }
         return emptyList()
     }
 
-    override fun getNotesStream(limit: Int): Flow<List<HomeNote>> =
-        noteDao.getNotes(limit).map { notes -> notes.map { it.toHomeNote() } }
+    override fun getNotesStream(limit: Int): Flow<List<Note>> =
+        noteDao.getNotes(limit).map { notes -> notes.map { it.toNote() } }
 
-    override fun getNoteStream(noteId: String): Flow<HomeNote?> =
-        noteDao.getNote(noteId).map { note -> note?.toHomeNote() }
+    override fun getNoteStream(noteId: String): Flow<Note?> =
+        noteDao.getNote(noteId).map { note -> note?.toNote() }
 
-    override fun searchNotesStream(query: String): Flow<List<HomeNote>> =
+    override fun searchNotesStream(query: String): Flow<List<Note>> =
         noteDao.getNotes().map { notes ->
             notes.filter { note -> matchesQuery(note.text, note.mediaList, query) }
-                .map { it.toHomeNote() }
+                .map { it.toNote() }
         }
 
-    override fun getFavoriteNotesStream(query: String): Flow<List<HomeNote>> =
+    override fun getFavoriteNotesStream(query: String): Flow<List<Note>> =
         noteDao.getFavoriteNotes().map { notes ->
             val matches =
                 if (query.isBlank()) notes
                 else notes.filter { note -> matchesQuery(note.text, note.mediaList, query) }
-            matches.map { it.toHomeNote() }
+            matches.map { it.toNote() }
         }
 
-    private fun getHomeNote(
+    private fun buildNote(
         noteDocumentSnapshot: DocumentSnapshot,
         userDocumentSnapshot: DocumentSnapshot
-    ) = HomeNote(
+    ) = Note(
         noteId = noteDocumentSnapshot.id,
         text = noteDocumentSnapshot.getString(FIELD_TEXT),
         createdDate = noteDocumentSnapshot.getDate(FIELD_CREATED)
             ?.let { Instant.fromEpochMilliseconds(it.time) },
-        favorite = noteDocumentSnapshot.getBoolean(FIELD_FAVORITE) == true,
+        isFavorite = noteDocumentSnapshot.getBoolean(FIELD_FAVORITE) == true,
         mediaList = (noteDocumentSnapshot.get(FIELD_MEDIA_LIST) as? List<*>)?.mapNotNull { item ->
             (item as? Map<*, *>)?.let { parseMediaDetail(it) }
         },
@@ -500,7 +500,7 @@ class DefaultNoteRepository @Inject constructor(
         videoUrl = mediaMap[FIELD_VIDEO_URL] as? String,
         thumbnailUrl = mediaMap[FIELD_THUMBNAIL_URL] as? String,
         isVideo = mediaMap[FIELD_VIDEO] as? Boolean == true,
-        generatedText = (mediaMap[FIELD_GENERATED_TEXT] as? List<*>)?.filterIsInstance<String>(),
+        generatedTexts = (mediaMap[FIELD_GENERATED_TEXT] as? List<*>)?.filterIsInstance<String>(),
         generatedObjects = (mediaMap[FIELD_GENERATED_OBJECTS] as? List<*>)?.mapNotNull { objectItem ->
             val map = objectItem as? Map<*, *>
             val name = map?.get(FIELD_OBJECT) as? String
@@ -537,7 +537,7 @@ class DefaultNoteRepository @Inject constructor(
     private fun matchesQuery(text: String?, mediaList: List<MediaDetail>?, query: String): Boolean =
         text?.contains(query, ignoreCase = true) == true ||
                 mediaList?.any { media ->
-                    media.generatedText?.any { it.contains(query, ignoreCase = true) } == true ||
+                    media.generatedTexts?.any { it.contains(query, ignoreCase = true) } == true ||
                             media.generatedObjects?.any {
                                 it.objectName.contains(query, ignoreCase = true)
                             } == true ||

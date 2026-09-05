@@ -63,10 +63,10 @@ fun HomeScreen(
     onNavigateToPhotoPreview: (url: String) -> Unit,
     onNavigateToVideoPreview: (url: String) -> Unit,
     onNavigateToExplore: () -> Unit,
-    scrollToTop: Long?,
+    scrollToTopRequestedAt: Long?,
     onScrollToTopConsumed: () -> Unit,
     snackbarHostState: SnackbarHostState,
-    onScrollDirectionChanged: (Boolean) -> Unit = {},
+    onScrollDirectionChanged: (isScrollingUp: Boolean) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -80,7 +80,7 @@ fun HomeScreen(
     ScrollDirectionEffect(listState, onScrollDirectionChanged)
 
     ScrollToTopEffect(
-        scrollToTop = scrollToTop,
+        scrollToTopRequestedAt = scrollToTopRequestedAt,
         listState = listState,
         hasItems = (content as? HomeContent.Success)?.notes?.isNotEmpty() == true,
         onConsumed = onScrollToTopConsumed
@@ -108,7 +108,7 @@ fun HomeScreen(
     // isLoadingMore is a key as well as a guard: without it, a shouldLoadMore that was already
     // true when the in-flight page landed would never re-trigger, and pagination would stall until
     // the user scrolled enough to flip it false and back. This cannot spin -- loadMoreNotes()
-    // returns without touching isLoadingMore once hasMoreData is false, so the key stops changing.
+    // returns without touching isLoadingMore once hasMore is false, so the key stops changing.
     LaunchedEffect(shouldLoadMore, uiState.isLoadingMore) {
         if (shouldLoadMore && !uiState.isLoadingMore) {
             viewModel.loadMoreNotes()
@@ -197,7 +197,7 @@ fun HomeScreen(
                                                     onNavigateToNotePreview(note.noteId)
                                                 },
                                                 onEditNote = { onNavigateToEditNote(note.noteId) },
-                                                onFavoriteNote = { viewModel.favoriteNote(note) },
+                                                onToggleFavorite = { viewModel.toggleFavorite(note) },
                                                 onDeleteNote = { viewModel.setNoteToDelete(note) },
                                                 onPhotoClick = { url ->
                                                     onNavigateToPhotoPreview(url)

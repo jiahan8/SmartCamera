@@ -44,7 +44,7 @@ const UNSPLASH_API_BASE_URL = "https://api.unsplash.com";
 // checks are UX-only, these are the actual enforcement boundary.
 const MAX_USERNAME_LENGTH = 30;
 const MAX_DISPLAY_NAME_LENGTH = 50;
-const MAX_POST_TEXT_LENGTH = 500;
+const MAX_NOTE_TEXT_LENGTH = 500;
 const USERNAME_PATTERN = /^[a-zA-Z0-9._]+$/;
 
 // Anti-abuse cap on how many media items a single note may carry. Not
@@ -339,7 +339,7 @@ function sanitizeMediaItem(media) {
 /**
  * Callable that creates a note under user/{uid}/note. Replaces the client's
  * direct Firestore write so the server -- not the client -- enforces
- * MAX_POST_TEXT_LENGTH, stamps the true owner into user_id (getHomeNote() on
+ * MAX_NOTE_TEXT_LENGTH, stamps the true owner into user_id (buildNote() on
  * the client trusts that field to look up whose username/profile picture to
  * render alongside the note), and strips any generatedText/generatedObjects/
  * generatedLabels a caller tries to inject at creation time.
@@ -365,7 +365,7 @@ exports.createNote = onCall(async (request) => {
   }
   const trimmedText = typeof rawText === "string" ? rawText.trim() : null;
   const text = trimmedText ? trimmedText : null;
-  if (text && text.length > MAX_POST_TEXT_LENGTH) {
+  if (text && text.length > MAX_NOTE_TEXT_LENGTH) {
     throw new HttpsError(
         "invalid-argument", "Text is too long.",
         {reason: "TEXT_TOO_LONG"},
@@ -773,7 +773,7 @@ exports.updateNote = onCall(async (request) => {
   }
   const trimmedText = typeof rawText === "string" ? rawText.trim() : null;
   const text = trimmedText ? trimmedText : null;
-  if (text && text.length > MAX_POST_TEXT_LENGTH) {
+  if (text && text.length > MAX_NOTE_TEXT_LENGTH) {
     throw new HttpsError(
         "invalid-argument", "Text is too long.",
         {reason: "TEXT_TOO_LONG"},

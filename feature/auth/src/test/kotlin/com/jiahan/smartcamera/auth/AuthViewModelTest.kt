@@ -51,9 +51,9 @@ class AuthViewModelTest {
 
     @Before
     fun setUp() {
-        every { analyticsRepository.logTextCustomEvent(any()) } just runs
-        every { analyticsRepository.logDisplayNameCustomEvent(any()) } just runs
-        every { analyticsRepository.logUsernameCustomEvent(any()) } just runs
+        every { analyticsRepository.logText(any()) } just runs
+        every { analyticsRepository.logDisplayName(any()) } just runs
+        every { analyticsRepository.logUsername(any()) } just runs
         every { analyticsRepository.setUserId(any()) } just runs
         every { authRepository.currentUserId } returns "test-uid"
         every { errorHandler.logError(any()) } just runs
@@ -76,40 +76,40 @@ class AuthViewModelTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `updateEmailText updates email StateFlow`() {
-        viewModel.updateEmailText("user@example.com")
+    fun `updateEmail updates email StateFlow`() {
+        viewModel.updateEmail("user@example.com")
         assertEquals("user@example.com", viewModel.uiState.value.email)
     }
 
     @Test
-    fun `updatePasswordText updates password StateFlow`() {
-        viewModel.updatePasswordText("secret123")
+    fun `updatePassword updates password StateFlow`() {
+        viewModel.updatePassword("secret123")
         assertEquals("secret123", viewModel.uiState.value.password)
     }
 
     @Test
-    fun `updateDisplayNameText updates displayName StateFlow`() {
-        viewModel.updateDisplayNameText("Jane Doe")
+    fun `updateDisplayName updates displayName StateFlow`() {
+        viewModel.updateDisplayName("Jane Doe")
         assertEquals("Jane Doe", viewModel.uiState.value.displayName)
     }
 
     @Test
-    fun `updateUsernameText updates username StateFlow`() {
-        viewModel.updateUsernameText("janedoe")
+    fun `updateUsername updates username StateFlow`() {
+        viewModel.updateUsername("janedoe")
         assertEquals("janedoe", viewModel.uiState.value.username)
     }
 
     @Test
     fun `updatePasswordVisibility true shows password`() {
         viewModel.updatePasswordVisibility(true)
-        assertTrue(viewModel.uiState.value.passwordVisible)
+        assertTrue(viewModel.uiState.value.isPasswordVisible)
     }
 
     @Test
     fun `updatePasswordVisibility false hides password`() {
         viewModel.updatePasswordVisibility(true)
         viewModel.updatePasswordVisibility(false)
-        assertFalse(viewModel.uiState.value.passwordVisible)
+        assertFalse(viewModel.uiState.value.isPasswordVisible)
     }
 
     // -------------------------------------------------------------------------
@@ -125,10 +125,10 @@ class AuthViewModelTest {
 
     @Test
     fun `toggleAuthMode clears all fields`() {
-        viewModel.updateEmailText("test@example.com")
-        viewModel.updatePasswordText("pass")
-        viewModel.updateDisplayNameText("Test")
-        viewModel.updateUsernameText("testuser")
+        viewModel.updateEmail("test@example.com")
+        viewModel.updatePassword("pass")
+        viewModel.updateDisplayName("Test")
+        viewModel.updateUsername("testuser")
 
         viewModel.toggleAuthMode()
 
@@ -150,8 +150,8 @@ class AuthViewModelTest {
 
     @Test
     fun `signIn with blank email sets Error state without network call`() = runTest {
-        viewModel.updateEmailText("   ")
-        viewModel.updatePasswordText("password")
+        viewModel.updateEmail("   ")
+        viewModel.updatePassword("password")
 
         viewModel.signIn()
 
@@ -160,7 +160,7 @@ class AuthViewModelTest {
 
     @Test
     fun `signIn with blank password sets Error state without network call`() = runTest {
-        viewModel.updateEmailText("user@example.com")
+        viewModel.updateEmail("user@example.com")
         // password left empty
 
         viewModel.signIn()
@@ -174,8 +174,8 @@ class AuthViewModelTest {
 
     @Test
     fun `signIn success with verified email sends NavigateToHome event`() = runTest {
-        viewModel.updateEmailText("user@example.com")
-        viewModel.updatePasswordText("password123")
+        viewModel.updateEmail("user@example.com")
+        viewModel.updatePassword("password123")
 
         coEvery { authRepository.signIn(any(), any()) } returns Result.success(Unit)
         coEvery { authRepository.checkEmailVerified() } returns Result.success(true)
@@ -193,8 +193,8 @@ class AuthViewModelTest {
 
     @Test
     fun `signIn success with verified email resets state to Idle`() = runTest {
-        viewModel.updateEmailText("user@example.com")
-        viewModel.updatePasswordText("password123")
+        viewModel.updateEmail("user@example.com")
+        viewModel.updatePassword("password123")
 
         coEvery { authRepository.signIn(any(), any()) } returns Result.success(Unit)
         coEvery { authRepository.checkEmailVerified() } returns Result.success(true)
@@ -209,9 +209,9 @@ class AuthViewModelTest {
     }
 
     @Test
-    fun `signIn success with unverified email sets Error with showResendButton true`() = runTest {
-        viewModel.updateEmailText("user@example.com")
-        viewModel.updatePasswordText("password123")
+    fun `signIn success with unverified email sets Error with isResendButtonVisible true`() = runTest {
+        viewModel.updateEmail("user@example.com")
+        viewModel.updatePassword("password123")
 
         coEvery { authRepository.signIn(any(), any()) } returns Result.success(Unit)
         coEvery { authRepository.checkEmailVerified() } returns Result.success(false)
@@ -220,7 +220,7 @@ class AuthViewModelTest {
 
         val state = viewModel.uiState.value.status
         assertTrue(state is AuthStatus.Error)
-        assertTrue(viewModel.uiState.value.showResendButton)
+        assertTrue(viewModel.uiState.value.isResendButtonVisible)
     }
 
     // -------------------------------------------------------------------------
@@ -236,8 +236,8 @@ class AuthViewModelTest {
             authRepository, userRepository, userPreferencesRepository,
             analyticsRepository, resourceProvider, errorHandler
         )
-        vm.updateEmailText("user@example.com")
-        vm.updatePasswordText("password123")
+        vm.updateEmail("user@example.com")
+        vm.updatePassword("password123")
         coEvery {
             authRepository.signIn(
                 any(),
@@ -273,10 +273,10 @@ class AuthViewModelTest {
             authRepository, userRepository, userPreferencesRepository,
             analyticsRepository, resourceProvider, errorHandler
         )
-        vm.updateEmailText("new@example.com")
-        vm.updatePasswordText("password123")
-        vm.updateDisplayNameText("New User")
-        vm.updateUsernameText("newuser")
+        vm.updateEmail("new@example.com")
+        vm.updatePassword("password123")
+        vm.updateDisplayName("New User")
+        vm.updateUsername("newuser")
         coEvery { authRepository.isUsernameAvailable("newuser") } coAnswers {
             delay(1.seconds); Result.success(true)
         }
@@ -300,8 +300,8 @@ class AuthViewModelTest {
 
     @Test
     fun `signIn network failure sets Error state`() = runTest {
-        viewModel.updateEmailText("user@example.com")
-        viewModel.updatePasswordText("wrongpass")
+        viewModel.updateEmail("user@example.com")
+        viewModel.updatePassword("wrongpass")
 
         val exception = RuntimeException("Invalid credentials")
         coEvery { authRepository.signIn(any(), any()) } returns Result.failure(exception)
@@ -316,8 +316,8 @@ class AuthViewModelTest {
 
     @Test
     fun `signIn checkEmailVerified failure sets Error state`() = runTest {
-        viewModel.updateEmailText("user@example.com")
-        viewModel.updatePasswordText("password123")
+        viewModel.updateEmail("user@example.com")
+        viewModel.updatePassword("password123")
 
         coEvery { authRepository.signIn(any(), any()) } returns Result.success(Unit)
         val exception = RuntimeException("verification check failed")
@@ -329,7 +329,7 @@ class AuthViewModelTest {
         val state = viewModel.uiState.value.status
         assertTrue(state is AuthStatus.Error)
         assertEquals("verification check failed", (state as AuthStatus.Error).message)
-        assertFalse(viewModel.uiState.value.showResendButton)
+        assertFalse(viewModel.uiState.value.isResendButtonVisible)
     }
 
     // -------------------------------------------------------------------------
@@ -338,10 +338,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signUp with blank email sets Error state`() = runTest {
-        viewModel.updateEmailText("")
-        viewModel.updatePasswordText("password")
-        viewModel.updateDisplayNameText("John")
-        viewModel.updateUsernameText("johndoe")
+        viewModel.updateEmail("")
+        viewModel.updatePassword("password")
+        viewModel.updateDisplayName("John")
+        viewModel.updateUsername("johndoe")
 
         viewModel.signUp()
 
@@ -350,10 +350,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signUp with blank displayName sets Error state`() = runTest {
-        viewModel.updateEmailText("new@example.com")
-        viewModel.updatePasswordText("password")
-        viewModel.updateDisplayNameText("")
-        viewModel.updateUsernameText("johndoe")
+        viewModel.updateEmail("new@example.com")
+        viewModel.updatePassword("password")
+        viewModel.updateDisplayName("")
+        viewModel.updateUsername("johndoe")
 
         viewModel.signUp()
 
@@ -362,10 +362,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signUp with blank username sets Error state`() = runTest {
-        viewModel.updateEmailText("new@example.com")
-        viewModel.updatePasswordText("password")
-        viewModel.updateDisplayNameText("John Doe")
-        viewModel.updateUsernameText("")
+        viewModel.updateEmail("new@example.com")
+        viewModel.updatePassword("password")
+        viewModel.updateDisplayName("John Doe")
+        viewModel.updateUsername("")
 
         viewModel.signUp()
 
@@ -374,10 +374,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signUp with too long displayName sets Error state`() = runTest {
-        viewModel.updateEmailText("new@example.com")
-        viewModel.updatePasswordText("password")
-        viewModel.updateDisplayNameText("a".repeat(51)) // MAX = 50
-        viewModel.updateUsernameText("johndoe")
+        viewModel.updateEmail("new@example.com")
+        viewModel.updatePassword("password")
+        viewModel.updateDisplayName("a".repeat(51)) // MAX = 50
+        viewModel.updateUsername("johndoe")
 
         viewModel.signUp()
 
@@ -386,10 +386,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signUp with invalid username characters sets Error state`() = runTest {
-        viewModel.updateEmailText("new@example.com")
-        viewModel.updatePasswordText("password")
-        viewModel.updateDisplayNameText("John Doe")
-        viewModel.updateUsernameText("user name!") // space and ! not allowed
+        viewModel.updateEmail("new@example.com")
+        viewModel.updatePassword("password")
+        viewModel.updateDisplayName("John Doe")
+        viewModel.updateUsername("user name!") // space and ! not allowed
 
         viewModel.signUp()
 
@@ -402,10 +402,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signUp with unavailable username sets Error state`() = runTest {
-        viewModel.updateEmailText("new@example.com")
-        viewModel.updatePasswordText("password")
-        viewModel.updateDisplayNameText("John Doe")
-        viewModel.updateUsernameText("taken")
+        viewModel.updateEmail("new@example.com")
+        viewModel.updatePassword("password")
+        viewModel.updateDisplayName("John Doe")
+        viewModel.updateUsername("taken")
 
         coEvery { authRepository.isUsernameAvailable("taken") } returns Result.success(false)
 
@@ -419,11 +419,11 @@ class AuthViewModelTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `signUp success sets Info state with showResendButton true`() = runTest {
-        viewModel.updateEmailText("new@example.com")
-        viewModel.updatePasswordText("password123")
-        viewModel.updateDisplayNameText("New User")
-        viewModel.updateUsernameText("newuser")
+    fun `signUp success sets Info state with isResendButtonVisible true`() = runTest {
+        viewModel.updateEmail("new@example.com")
+        viewModel.updatePassword("password123")
+        viewModel.updateDisplayName("New User")
+        viewModel.updateUsername("newuser")
 
         coEvery { authRepository.isUsernameAvailable("newuser") } returns Result.success(true)
         coEvery { authRepository.signUp(any(), any(), any(), any()) } returns Result.success(Unit)
@@ -433,7 +433,7 @@ class AuthViewModelTest {
 
         val state = viewModel.uiState.value.status
         assertTrue(state is AuthStatus.Info)
-        assertTrue(viewModel.uiState.value.showResendButton)
+        assertTrue(viewModel.uiState.value.isResendButtonVisible)
     }
 
     // -------------------------------------------------------------------------
@@ -442,10 +442,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signUp isUsernameAvailable failure sets Error state`() = runTest {
-        viewModel.updateEmailText("new@example.com")
-        viewModel.updatePasswordText("password")
-        viewModel.updateDisplayNameText("John Doe")
-        viewModel.updateUsernameText("johndoe")
+        viewModel.updateEmail("new@example.com")
+        viewModel.updatePassword("password")
+        viewModel.updateDisplayName("John Doe")
+        viewModel.updateUsername("johndoe")
 
         val exception = RuntimeException("network down")
         coEvery { authRepository.isUsernameAvailable("johndoe") } returns Result.failure(exception)
@@ -460,10 +460,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signUp repository failure sets Error state`() = runTest {
-        viewModel.updateEmailText("new@example.com")
-        viewModel.updatePasswordText("password123")
-        viewModel.updateDisplayNameText("New User")
-        viewModel.updateUsernameText("newuser")
+        viewModel.updateEmail("new@example.com")
+        viewModel.updatePassword("password123")
+        viewModel.updateDisplayName("New User")
+        viewModel.updateUsername("newuser")
 
         coEvery { authRepository.isUsernameAvailable("newuser") } returns Result.success(true)
         val exception = RuntimeException("signup failed")
@@ -476,7 +476,7 @@ class AuthViewModelTest {
         val state = viewModel.uiState.value.status
         assertTrue(state is AuthStatus.Error)
         assertEquals("signup failed", (state as AuthStatus.Error).message)
-        assertFalse(viewModel.uiState.value.showResendButton)
+        assertFalse(viewModel.uiState.value.isResendButtonVisible)
     }
 
     // -------------------------------------------------------------------------
@@ -485,14 +485,14 @@ class AuthViewModelTest {
 
     @Test
     fun `resetPassword with blank email sets Error state`() = runTest {
-        viewModel.updateEmailText("")
+        viewModel.updateEmail("")
         viewModel.resetPassword()
         assertTrue(viewModel.uiState.value.status is AuthStatus.Error)
     }
 
     @Test
     fun `resetPassword with unregistered email sets Error state`() = runTest {
-        viewModel.updateEmailText("unknown@example.com")
+        viewModel.updateEmail("unknown@example.com")
         coEvery {
             authRepository.isEmailRegistered("unknown@example.com")
         } returns Result.success(false)
@@ -504,7 +504,7 @@ class AuthViewModelTest {
 
     @Test
     fun `resetPassword success sets Info state`() = runTest {
-        viewModel.updateEmailText("user@example.com")
+        viewModel.updateEmail("user@example.com")
         coEvery { authRepository.isEmailRegistered("user@example.com") } returns Result.success(true)
         coEvery { authRepository.resetPassword("user@example.com") } returns Result.success(Unit)
         every { resourceProvider.getString(any()) } returns "Reset email sent"
@@ -516,7 +516,7 @@ class AuthViewModelTest {
 
     @Test
     fun `resetPassword repository failure sets Error state`() = runTest {
-        viewModel.updateEmailText("user@example.com")
+        viewModel.updateEmail("user@example.com")
         coEvery {
             authRepository.isEmailRegistered("user@example.com")
         } returns Result.success(true)
@@ -537,7 +537,7 @@ class AuthViewModelTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `resendVerificationEmail success sets Info with showResendButton true`() = runTest {
+    fun `resendVerificationEmail success sets Info with isResendButtonVisible true`() = runTest {
         coEvery { authRepository.sendEmailVerification() } returns Result.success(Unit)
         every { resourceProvider.getString(any()) } returns "Email resent"
 
@@ -545,7 +545,7 @@ class AuthViewModelTest {
 
         val state = viewModel.uiState.value.status
         assertTrue(state is AuthStatus.Info)
-        assertTrue(viewModel.uiState.value.showResendButton)
+        assertTrue(viewModel.uiState.value.isResendButtonVisible)
     }
 
     @Test

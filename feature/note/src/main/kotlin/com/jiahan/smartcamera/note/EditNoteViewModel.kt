@@ -6,8 +6,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.jiahan.smartcamera.data.repository.AnalyticsRepository
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
-import com.jiahan.smartcamera.util.AppConstants.MAX_POST_TEXT_LENGTH
+import com.jiahan.smartcamera.domain.Note
+import com.jiahan.smartcamera.util.AppConstants.MAX_NOTE_TEXT_LENGTH
 import com.jiahan.smartcamera.util.ErrorHandler
 import com.jiahan.smartcamera.util.ErrorTag
 import com.jiahan.smartcamera.util.ResourceProvider
@@ -25,7 +25,7 @@ import com.jiahan.smartcamera.core.common.R as CommonR
 
 sealed interface EditNoteContent {
     data object Loading : EditNoteContent
-    data class Success(val note: HomeNote) : EditNoteContent
+    data class Success(val note: Note) : EditNoteContent
     data class Error(val message: String) : EditNoteContent
 }
 
@@ -40,7 +40,7 @@ data class EditNoteUiState(
     val content: EditNoteContent = EditNoteContent.Loading,
     val noteText: String = "",
     val noteTextError: String? = null,
-    val showDiscardDialog: Boolean = false,
+    val isDiscardDialogVisible: Boolean = false,
     val saveStatus: SaveStatus = SaveStatus.Idle
 )
 
@@ -130,12 +130,12 @@ class EditNoteViewModel @Inject constructor(
         )
 
     fun updateNoteText(text: String) {
-        analyticsRepository.logEditNoteCustomEvent(text)
+        analyticsRepository.logNoteEdit(text)
         _uiState.update {
             it.copy(
                 noteText = text,
                 noteTextError = when {
-                    text.length > MAX_POST_TEXT_LENGTH ->
+                    text.length > MAX_NOTE_TEXT_LENGTH ->
                         resourceProvider.getString(CommonR.string.note_validation)
 
                     else -> null
@@ -167,8 +167,12 @@ class EditNoteViewModel @Inject constructor(
         }
     }
 
-    fun setShowDiscardDialog(show: Boolean) {
-        _uiState.update { it.copy(showDiscardDialog = show) }
+    fun showDiscardDialog() {
+        _uiState.update { it.copy(isDiscardDialogVisible = true) }
+    }
+
+    fun dismissDiscardDialog() {
+        _uiState.update { it.copy(isDiscardDialogVisible = false) }
     }
 
     fun resetSaveStatus() {

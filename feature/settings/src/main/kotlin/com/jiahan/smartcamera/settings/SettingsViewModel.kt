@@ -44,9 +44,9 @@ sealed interface SettingsDialogState {
         val currentPassword: String = "",
         val newPassword: String = "",
         val confirmNewPassword: String = "",
-        val currentPasswordVisible: Boolean = false,
-        val newPasswordVisible: Boolean = false,
-        val confirmNewPasswordVisible: Boolean = false,
+        val isCurrentPasswordVisible: Boolean = false,
+        val isNewPasswordVisible: Boolean = false,
+        val isConfirmNewPasswordVisible: Boolean = false,
         val newPasswordErrorMessage: String? = null,
         val confirmNewPasswordErrorMessage: String? = null,
     ) : SettingsDialogState
@@ -83,7 +83,7 @@ class SettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState = _uiState.asStateFlow()
 
-    val isDarkTheme = userPreferencesRepository.userPreferencesFlow
+    val isDarkTheme = userPreferencesRepository.userPreferences
         .map { it.isDarkTheme }
         .stateIn(
             scope = viewModelScope,
@@ -91,10 +91,10 @@ class SettingsViewModel @Inject constructor(
             initialValue = false
         )
 
-    fun updateDarkThemeVisibility(showDarkTheme: Boolean) {
+    fun setDarkTheme(enabled: Boolean) {
         viewModelScope.launch {
-            userPreferencesRepository.updateDarkThemeVisibility(showDarkTheme)
-                .onFailure { e -> errorHandler.logError(e) }
+            userPreferencesRepository.setDarkTheme(enabled)
+                .onFailure(errorHandler::logError)
         }
     }
 
@@ -156,12 +156,12 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(dialogState = SettingsDialogState.None) }
     }
 
-    fun updateCurrentPasswordText(text: String) {
+    fun updateCurrentPassword(text: String) {
         updateChangePasswordDialog { it.copy(currentPassword = text) }
-        analyticsRepository.logTextCustomEvent(text)
+        analyticsRepository.logText(text)
     }
 
-    fun updateNewPasswordText(text: String) {
+    fun updateNewPassword(text: String) {
         updateChangePasswordDialog {
             it.copy(
                 newPassword = text,
@@ -169,17 +169,17 @@ class SettingsViewModel @Inject constructor(
                 confirmNewPasswordErrorMessage = mismatchError(text, it.confirmNewPassword)
             )
         }
-        analyticsRepository.logTextCustomEvent(text)
+        analyticsRepository.logText(text)
     }
 
-    fun updateConfirmNewPasswordText(text: String) {
+    fun updateConfirmNewPassword(text: String) {
         updateChangePasswordDialog {
             it.copy(
                 confirmNewPassword = text,
                 confirmNewPasswordErrorMessage = mismatchError(it.newPassword, text)
             )
         }
-        analyticsRepository.logTextCustomEvent(text)
+        analyticsRepository.logText(text)
     }
 
     private fun mismatchError(newPassword: String, confirmNewPassword: String): String? =
@@ -188,15 +188,15 @@ class SettingsViewModel @Inject constructor(
         else null
 
     fun updateCurrentPasswordVisibility(visible: Boolean) {
-        updateChangePasswordDialog { it.copy(currentPasswordVisible = visible) }
+        updateChangePasswordDialog { it.copy(isCurrentPasswordVisible = visible) }
     }
 
     fun updateNewPasswordVisibility(visible: Boolean) {
-        updateChangePasswordDialog { it.copy(newPasswordVisible = visible) }
+        updateChangePasswordDialog { it.copy(isNewPasswordVisible = visible) }
     }
 
     fun updateConfirmNewPasswordVisibility(visible: Boolean) {
-        updateChangePasswordDialog { it.copy(confirmNewPasswordVisible = visible) }
+        updateChangePasswordDialog { it.copy(isConfirmNewPasswordVisible = visible) }
     }
 
     private fun updateChangePasswordDialog(
@@ -216,7 +216,7 @@ class SettingsViewModel @Inject constructor(
                 dialog.newPassword,
                 requireNonBlank = true
             ) as? ValidationResult.Error)
-                ?.let { resourceProvider.getString(validationErrorMessageResId(it.error)) }
+                ?.let { resourceProvider.getString(validationErrorMessageResId(it.reason)) }
         val confirmError = when {
             dialog.confirmNewPassword.isBlank() ->
                 resourceProvider.getString(CommonR.string.password_empty)
@@ -268,7 +268,7 @@ class SettingsViewModel @Inject constructor(
         _navigationEvent.trySend(SettingsNavigationEvent.OpenLanguageSettings)
     }
 
-    fun resetActionError() {
+    fun dismissError() {
         _uiState.update { it.copy(status = SettingsStatus.Idle) }
     }
 

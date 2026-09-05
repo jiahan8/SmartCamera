@@ -8,7 +8,7 @@ package com.jiahan.smartcamera.domain
  * has ended. It is null exactly when this page was the last one.
  */
 data class NotePage(
-    val notes: List<HomeNote>,
+    val notes: List<Note>,
     val nextCursor: NoteCursor? = null
 ) {
     val hasMore: Boolean get() = nextCursor != null

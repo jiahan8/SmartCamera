@@ -16,7 +16,7 @@ import com.jiahan.smartcamera.fake.FakeResourceProvider
 import com.jiahan.smartcamera.fake.FakeUserPreferencesRepository
 import com.jiahan.smartcamera.fake.FakeUserRepository
 import com.jiahan.smartcamera.feature.auth.R
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -58,7 +58,7 @@ class AuthScreenTest {
             errorHandler = FakeErrorHandler(),
         )
         composeTestRule.setContent {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 AuthScreen(
                     onNavigateToHome = { navigatedToHome = true },
                     // Any drawable will do: the logo is hoisted out of the screen, so what the

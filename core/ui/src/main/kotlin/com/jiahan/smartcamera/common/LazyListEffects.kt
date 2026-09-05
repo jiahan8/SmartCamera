@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
 @Composable
 fun ScrollDirectionEffect(
     listState: LazyListState,
-    onScrollDirectionChanged: (Boolean) -> Unit
+    onScrollDirectionChanged: (isScrollingUp: Boolean) -> Unit
 ) {
     LaunchedEffect(listState) {
         onScrollDirectionChanged(true)
@@ -31,24 +31,24 @@ fun ScrollDirectionEffect(
 }
 
 /**
- * Scrolls [listState] back to the top when [scrollToTop] carries a new timestamp, then reports it
+ * Scrolls [listState] back to the top when [scrollToTopRequestedAt] carries a new timestamp, then reports it
  * consumed.
  *
  * [hasItems] is a key, not just a read. The request arrives from `MainViewModel` the moment a
  * top-level tab is re-tapped, which can be before the list has anything in it; keyed on
- * [scrollToTop] alone the effect would run once against an empty list, skip the body, and never
- * fire again -- dropping the request and leaving `scrollToTop` unconsumed, since `onConsumed` is
+ * [scrollToTopRequestedAt] alone the effect would run once against an empty list, skip the body, and never
+ * fire again -- dropping the request and leaving `scrollToTopRequestedAt` unconsumed, since `onConsumed` is
  * inside the guard. With both as keys, the pending scroll runs as soon as the items land.
  */
 @Composable
 fun ScrollToTopEffect(
-    scrollToTop: Long?,
+    scrollToTopRequestedAt: Long?,
     listState: LazyListState,
     hasItems: Boolean,
     onConsumed: () -> Unit
 ) {
-    LaunchedEffect(scrollToTop, hasItems) {
-        scrollToTop?.let {
+    LaunchedEffect(scrollToTopRequestedAt, hasItems) {
+        scrollToTopRequestedAt?.let {
             if (hasItems) {
                 listState.animateScrollToItem(0)
                 onConsumed()

@@ -10,7 +10,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.jiahan.smartcamera.core.ui.R as UiR
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.fake.FakeAnalyticsRepository
 import com.jiahan.smartcamera.fake.FakeErrorHandler
 import com.jiahan.smartcamera.fake.FakeNoteRepository
@@ -18,7 +18,7 @@ import com.jiahan.smartcamera.fake.FakeMediaFileRepository
 import com.jiahan.smartcamera.fake.FakeResourceProvider
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -38,11 +38,11 @@ class FavoriteScreenTest {
     private val noteRepository = FakeNoteRepository()
     private var navigatedToNotePreview: String? = null
 
-    private fun note(noteId: String, text: String) = HomeNote(
+    private fun note(noteId: String, text: String) = Note(
         noteId = noteId,
         text = text,
         username = "tester",
-        favorite = true,
+        isFavorite = true,
     )
 
     private fun launchFavoriteScreen() {
@@ -60,14 +60,14 @@ class FavoriteScreenTest {
             errorHandler = errorHandler,
         )
         composeTestRule.setContent {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 FavoriteScreen(
                     onNavigateToNotePreview = { navigatedToNotePreview = it },
                     onNavigateToEditNote = {},
                     onNavigateToPhotoPreview = {},
                     onNavigateToVideoPreview = {},
                     viewModel = viewModel,
-                    scrollToTop = null,
+                    scrollToTopRequestedAt = null,
                     onScrollToTopConsumed = {},
                     snackbarHostState = remember { SnackbarHostState() },
                 )

@@ -27,7 +27,7 @@ import com.jiahan.smartcamera.fake.FakeMediaFileRepository
 import com.jiahan.smartcamera.fake.FakeNoteRepository
 import com.jiahan.smartcamera.fake.FakeResourceProvider
 import com.jiahan.smartcamera.fake.FakeUserPreferencesRepository
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Rule
@@ -42,7 +42,7 @@ import org.junit.Test
  * The camera/gallery picker icons (photo library, take photo, take video) are NOT exercised here:
  * they launch real system Activities via `rememberLauncherForActivityResult`, which would need
  * Espresso-Intents to stub — not used anywhere else in this codebase. Instead, media-carousel
- * behavior (display, tap-to-preview, remove) is tested by calling [NoteViewModel.updateUriList]
+ * behavior (display, tap-to-preview, remove) is tested by calling [NoteViewModel.addMedia]
  * directly, which is exactly what each picker's result callback does on success — this exercises
  * the same downstream state and UI, just skipping the system picker UI itself.
  */
@@ -66,7 +66,7 @@ class NoteScreenTest {
                 initial = UserPreferences(
                     isDarkTheme = false,
                     username = "tester",
-                    profilePicture = null,
+                    profilePictureUrl = null,
                 )
             ),
             analyticsRepository = FakeAnalyticsRepository(),
@@ -76,7 +76,7 @@ class NoteScreenTest {
             errorHandler = FakeErrorHandler(),
         )
         composeTestRule.setContent {
-            SmartCameraTheme {
+            SmartPhotosTheme {
                 NoteScreen(
                     onBack = { navigatedBack = true },
                     onNavigateToPhotoPreview = { navigatedToPhotoPreviewUri = it },
@@ -151,7 +151,7 @@ class NoteScreenTest {
         launchNoteScreen()
         waitForText("tester")
 
-        viewModel.updateUriList(listOf(Uri.parse("content://fake/photo1")))
+        viewModel.addMedia(listOf(Uri.parse("content://fake/photo1")))
 
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
             composeTestRule.onAllNodesWithContentDescription(string(UiR.string.cd_note_photo))
@@ -167,7 +167,7 @@ class NoteScreenTest {
         )
         launchNoteScreen()
         waitForText("tester")
-        viewModel.updateUriList(listOf(Uri.parse("content://fake/photo1")))
+        viewModel.addMedia(listOf(Uri.parse("content://fake/photo1")))
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
             composeTestRule.onAllNodesWithContentDescription(string(UiR.string.cd_note_photo))
                 .fetchSemanticsNodes().isNotEmpty()
@@ -186,7 +186,7 @@ class NoteScreenTest {
         )
         launchNoteScreen()
         waitForText("tester")
-        viewModel.updateUriList(listOf(Uri.parse("content://fake/photo1")))
+        viewModel.addMedia(listOf(Uri.parse("content://fake/photo1")))
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
             composeTestRule.onAllNodesWithContentDescription(string(UiR.string.cd_note_photo))
                 .fetchSemanticsNodes().isNotEmpty()

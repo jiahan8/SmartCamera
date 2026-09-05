@@ -93,7 +93,7 @@ fun PhotoPreviewScreen(
             var composableSize by remember { mutableStateOf(IntSize.Zero) }
 
             // Whether the photo is still being decoded/downloaded by Coil
-            var isPhotoLoading by remember { mutableStateOf(true) }
+            var isImageLoading by remember { mutableStateOf(true) }
 
             // State for handling pinch-to-zoom and pan gestures
             val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
@@ -183,7 +183,7 @@ fun PhotoPreviewScreen(
             }
             // Drawn before (and therefore behind) the photo, so it never tints the image
             // during the frame where both are on screen.
-            if (isPhotoLoading) {
+            if (isImageLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -205,10 +205,10 @@ fun PhotoPreviewScreen(
                     )
                     .then(doubleTapModifier)
                     .transformable(state = transformableState),
-                onLoading = { isPhotoLoading = true },
-                onSuccess = { isPhotoLoading = false },
+                onLoading = { isImageLoading = true },
+                onSuccess = { isImageLoading = false },
                 onError = {
-                    isPhotoLoading = false
+                    isImageLoading = false
                     viewModel.logImageLoadError(it.result.throwable)
                 }
             )
@@ -225,7 +225,7 @@ fun PhotoPreviewScreen(
             },
             actions = {
                 IconButton(
-                    onClick = { viewModel.sharePhoto() },
+                    onClick = viewModel::sharePhoto,
                     enabled = !isSharing
                 ) {
                     if (isSharing) {

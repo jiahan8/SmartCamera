@@ -49,7 +49,7 @@ import com.jiahan.smartcamera.navigation.navPopExitTransition
 import com.jiahan.smartcamera.navigation.smartPhotosNavGraph
 import com.jiahan.smartcamera.note.NoteRoute
 import com.jiahan.smartcamera.preview.NotePreviewRoute
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import com.jiahan.smartcamera.util.AppConstants.ANIMATION_DURATION_SHORT_MS
 
 @Composable
@@ -57,19 +57,19 @@ fun SmartPhotosApp(
     isDarkTheme: Boolean,
     isAppReady: Boolean,
     startDestination: Any,
-    showBottomBar: Boolean,
-    scrollToTop: Long?,
+    isBottomBarVisible: Boolean,
+    scrollToTopRequestedAt: Long?,
     hasPendingShare: Boolean,
     pendingNoteId: String?,
     isUpdateReadyToInstall: Boolean,
-    onScrollDirectionChanged: (Boolean) -> Unit,
+    onScrollDirectionChanged: (isScrollingUp: Boolean) -> Unit,
     onScrollToTopConsumed: () -> Unit,
     onTriggerScrollToTop: () -> Unit,
     onUpdateStartDestination: (Any) -> Unit,
     onPendingNoteIdConsumed: () -> Unit,
     onCompleteUpdate: () -> Unit,
 ) {
-    SmartCameraTheme(darkTheme = isDarkTheme) {
+    SmartPhotosTheme(darkTheme = isDarkTheme) {
         val view = LocalView.current
         val activity = LocalActivity.current
         if (!view.isInEditMode) {
@@ -94,10 +94,10 @@ fun SmartPhotosApp(
 
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
-        val isBottomBarVisible = remember(currentDestination, showBottomBar) {
+        val isBottomBarVisible = remember(currentDestination, isBottomBarVisible) {
             TopLevelDestination.entries.any { destination ->
                 currentDestination?.hasRoute(destination.route::class) == true
-            } && showBottomBar
+            } && isBottomBarVisible
         }
 
         LaunchedEffect(hasPendingShare, currentDestination) {
@@ -190,7 +190,7 @@ fun SmartPhotosApp(
                         ) {
                             smartPhotosNavGraph(
                                 navController = navController,
-                                scrollToTop = scrollToTop,
+                                scrollToTopRequestedAt = scrollToTopRequestedAt,
                                 onScrollDirectionChanged = onScrollDirectionChanged,
                                 onScrollToTopConsumed = onScrollToTopConsumed,
                                 onUpdateStartDestination = onUpdateStartDestination,

@@ -1,8 +1,8 @@
 package com.jiahan.smartcamera.data.repository
 
-import com.jiahan.smartcamera.domain.HomeNote
 import com.jiahan.smartcamera.domain.MediaDetail
 import com.jiahan.smartcamera.domain.MediaUri
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.domain.NoteCursor
 import com.jiahan.smartcamera.domain.NoteMediaDetail
 import com.jiahan.smartcamera.domain.NotePage
@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.Flow
  *
  * Every fallible operation returns [Result] so that callers never need to
  * wrap calls in try/catch.
- * Only [getNotesStream], [getFavoriteNotesStream] and [quickUploadMediaToFirebase] are exempt:
+ * Only [getNotesStream], [getFavoriteNotesStream] and [uploadMediaToCache] are exempt:
  * the first two are reactive Flows and the last is fire-and-forget.
  */
 interface NoteRepository {
@@ -28,12 +28,12 @@ interface NoteRepository {
         pageSize: Int = DEFAULT_PAGE_SIZE
     ): Result<NotePage>
 
-    suspend fun addNote(homeNote: HomeNote): Result<Unit>
-    suspend fun updateNote(homeNote: HomeNote): Result<Unit>
-    suspend fun searchNotes(query: String): Result<List<HomeNote>>
+    suspend fun addNote(note: Note): Result<Unit>
+    suspend fun updateNote(note: Note): Result<Unit>
+    suspend fun searchNotes(query: String): Result<List<Note>>
     suspend fun deleteNote(noteId: String): Result<Unit>
-    suspend fun favoriteNote(homeNote: HomeNote): Result<Unit>
-    suspend fun getNote(noteId: String): Result<HomeNote>
+    suspend fun toggleFavorite(note: Note): Result<Unit>
+    suspend fun getNote(noteId: String): Result<Note>
 
     /**
      * Fire-and-forget upload of [uriList] into the cache storage folder: failures are logged
@@ -43,12 +43,12 @@ interface NoteRepository {
      * deleted once its upload is done, whether that upload succeeded, failed, or was skipped.
      * Leave it `false` for URIs the app doesn't own, such as gallery picks.
      */
-    suspend fun quickUploadMediaToFirebase(
+    suspend fun uploadMediaToCache(
         uriList: List<MediaUri>,
         deleteAfterUpload: Boolean = false
     )
 
-    suspend fun uploadMediaToFirebase(noteMediaDetailList: List<NoteMediaDetail>): Result<List<MediaDetail>>
+    suspend fun uploadMedia(noteMediaDetailList: List<NoteMediaDetail>): Result<List<MediaDetail>>
     suspend fun buildLocalMediaDetails(uriList: List<MediaUri>): Result<List<NoteMediaDetail>>
 
     /**
@@ -64,7 +64,7 @@ interface NoteRepository {
      * subscriber keeps the two in step: it widens the window as it pages, so the feed shows what it
      * has fetched rather than everything any other caller has since written into the table.
      */
-    fun getNotesStream(limit: Int): Flow<List<HomeNote>>
+    fun getNotesStream(limit: Int): Flow<List<Note>>
 
     /**
      * One mirrored note, emitting null once it is gone from the table.
@@ -73,7 +73,7 @@ interface NoteRepository {
      * favorite toggle without re-fetching, which is what a detail screen sitting on the back stack
      * needs.
      */
-    fun getNoteStream(noteId: String): Flow<HomeNote?>
+    fun getNoteStream(noteId: String): Flow<Note?>
 
     /**
      * The mirror filtered by [query], re-emitting on every write to the table.
@@ -82,7 +82,7 @@ interface NoteRepository {
      * covers notes the feed has never paged. Filtering happens in Kotlin rather than SQL because a
      * note's media is a JSON column -- the same reason [getFavoriteNotesStream] does.
      */
-    fun searchNotesStream(query: String): Flow<List<HomeNote>>
-    fun getFavoriteNotesStream(query: String): Flow<List<HomeNote>>
+    fun searchNotesStream(query: String): Flow<List<Note>>
+    fun getFavoriteNotesStream(query: String): Flow<List<Note>>
     suspend fun syncFavoriteNotes(): Result<Unit>
 }

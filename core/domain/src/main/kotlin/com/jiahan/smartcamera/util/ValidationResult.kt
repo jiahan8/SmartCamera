@@ -41,7 +41,7 @@ enum class ValidationError {
  * A sealed type rather than a nullable [ValidationError], per the Kotlin conventions in AGENTS.md:
  * [Success] is a state, not the absence of one.
  */
-sealed class ValidationResult {
-    object Success : ValidationResult()
-    data class Error(val error: ValidationError) : ValidationResult()
+sealed interface ValidationResult {
+    data object Success : ValidationResult
+    data class Error(val reason: ValidationError) : ValidationResult
 }

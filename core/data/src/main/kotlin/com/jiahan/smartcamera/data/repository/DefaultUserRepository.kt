@@ -229,7 +229,7 @@ class DefaultUserRepository @Inject constructor(
         metadata = snapshot.getString(FIELD_METADATA) ?: "",
         displayName = snapshot.getString(FIELD_DISPLAY_NAME) ?: "",
         username = snapshot.getString(FIELD_USERNAME) ?: "",
-        profilePicture = snapshot.getString(FIELD_PROFILE_PICTURE),
+        profilePictureUrl = snapshot.getString(FIELD_PROFILE_PICTURE),
         createdDate = snapshot.getDate(FIELD_CREATED)
             ?.let { Instant.fromEpochMilliseconds(it.time) }
             ?: Clock.System.now(),

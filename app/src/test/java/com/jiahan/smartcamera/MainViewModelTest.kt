@@ -65,14 +65,14 @@ class MainViewModelTest {
     }
 
     private val defaultPrefs =
-        UserPreferences(isDarkTheme = false, username = "", profilePicture = null)
+        UserPreferences(isDarkTheme = false, username = "", profilePictureUrl = null)
 
     @Before
     fun setUp() {
         coEvery { remoteConfigRepository.fetchAndActivateConfig() } returns Result.success(Unit)
         every { analyticsRepository.setUserId(any()) } just runs
         every { errorHandler.logError(any()) } just runs
-        every { userPreferencesRepository.userPreferencesFlow } returns flowOf(defaultPrefs)
+        every { userPreferencesRepository.userPreferences } returns flowOf(defaultPrefs)
         every { incomingShareHandler.incomingShare } returns MutableStateFlow(null)
         every { incomingShareHandler.postShare(any()) } just runs
         every { appUpdateRepository.observeUpdateState() } returns flowOf()
@@ -165,10 +165,10 @@ class MainViewModelTest {
     // Bottom bar visibility
     // -------------------------------------------------------------------------
     @Test
-    fun `showBottomBar is true by default`() = runTest {
+    fun `isBottomBarVisible is true by default`() = runTest {
         val vm = createViewModel()
 
-        assertTrue(vm.uiState.value.showBottomBar)
+        assertTrue(vm.uiState.value.isBottomBarVisible)
     }
 
     @Test
@@ -177,7 +177,7 @@ class MainViewModelTest {
 
         vm.updateBottomBarVisibility(false)
 
-        assertFalse(vm.uiState.value.showBottomBar)
+        assertFalse(vm.uiState.value.isBottomBarVisible)
     }
 
     @Test
@@ -187,7 +187,7 @@ class MainViewModelTest {
         vm.updateBottomBarVisibility(false)
         vm.updateBottomBarVisibility(true)
 
-        assertTrue(vm.uiState.value.showBottomBar)
+        assertTrue(vm.uiState.value.isBottomBarVisible)
     }
 
     // -------------------------------------------------------------------------
@@ -206,10 +206,10 @@ class MainViewModelTest {
     // Scroll to top
     // -------------------------------------------------------------------------
     @Test
-    fun `scrollToTop is null initially`() = runTest {
+    fun `scrollToTopRequestedAt is null initially`() = runTest {
         val vm = createViewModel()
 
-        assertNull(vm.uiState.value.scrollToTop)
+        assertNull(vm.uiState.value.scrollToTopRequestedAt)
     }
 
     @Test
@@ -218,7 +218,7 @@ class MainViewModelTest {
 
         vm.triggerScrollToTop()
 
-        assertNotNull(vm.uiState.value.scrollToTop)
+        assertNotNull(vm.uiState.value.scrollToTopRequestedAt)
     }
 
     @Test
@@ -228,7 +228,7 @@ class MainViewModelTest {
         vm.triggerScrollToTop()
         vm.consumeScrollToTopEvent()
 
-        assertNull(vm.uiState.value.scrollToTop)
+        assertNull(vm.uiState.value.scrollToTopRequestedAt)
     }
 
     // -------------------------------------------------------------------------
@@ -242,10 +242,10 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `onNotificationNoteIdReceived sets pendingNoteId`() = runTest {
+    fun `openNoteFromNotification sets pendingNoteId`() = runTest {
         val vm = createViewModel()
 
-        vm.onNotificationNoteIdReceived("note_123")
+        vm.openNoteFromNotification("note_123")
 
         assertEquals("note_123", vm.uiState.value.pendingNoteId)
     }
@@ -254,7 +254,7 @@ class MainViewModelTest {
     fun `consumePendingNoteId clears pendingNoteId`() = runTest {
         val vm = createViewModel()
 
-        vm.onNotificationNoteIdReceived("note_123")
+        vm.openNoteFromNotification("note_123")
         vm.consumePendingNoteId()
 
         assertNull(vm.uiState.value.pendingNoteId)

@@ -19,7 +19,7 @@ data class PhotoPreviewRoute(val type: MediaSourceType, val source: String)
 data class VideoPreviewRoute(val type: MediaSourceType, val source: String)
 
 @Serializable
-data class NotePreviewRoute(val id: String)
+data class NotePreviewRoute(val noteId: String)
 
 // Navigation Compose's type-safe routes resolve enum route arguments via Class.forName() at
 // runtime (see the AndroidX Navigation NavType.EnumType source); @Keep stops R8 from renaming or

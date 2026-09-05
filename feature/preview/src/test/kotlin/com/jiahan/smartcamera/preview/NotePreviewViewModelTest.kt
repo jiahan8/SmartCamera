@@ -6,7 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import com.jiahan.smartcamera.MainDispatcherRule
 import com.jiahan.smartcamera.data.repository.NoteRepository
-import com.jiahan.smartcamera.domain.HomeNote
+import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.util.ErrorHandler
@@ -60,13 +60,13 @@ class NotePreviewViewModelTest {
     private val noteId = "note1"
 
     /** Stands in for this note's row. The screen renders it, not the fetch that fills it. */
-    private val noteMirror = MutableStateFlow<HomeNote?>(null)
+    private val noteMirror = MutableStateFlow<Note?>(null)
 
-    private val testNote = HomeNote(
+    private val testNote = Note(
         text = "Test note",
         noteId = noteId,
         username = "testUser",
-        favorite = false
+        isFavorite = false
     )
 
     /**
@@ -75,7 +75,7 @@ class NotePreviewViewModelTest {
      */
     private fun TestScope.createViewModel(): NotePreviewViewModel {
         val viewModel = NotePreviewViewModel(
-            savedStateHandle = SavedStateHandle(mapOf("id" to noteId)),
+            savedStateHandle = SavedStateHandle(mapOf("noteId" to noteId)),
             noteRepository = noteRepository,
             noteErrorReporter = noteErrorReporter,
             errorHandler = errorHandler,
@@ -208,37 +208,37 @@ class NotePreviewViewModelTest {
     }
 
     // -------------------------------------------------------------------------
-    // favoriteNote
+    // toggleFavorite
     // -------------------------------------------------------------------------
 
     @Test
-    fun `favoriteNote toggle reaches the screen through the mirror`() = runTest {
+    fun `toggleFavorite reaches the screen through the mirror`() = runTest {
         val viewModel = createViewModel()
-        coEvery { noteRepository.favoriteNote(testNote) } coAnswers {
-            noteMirror.value = testNote.copy(favorite = true)
+        coEvery { noteRepository.toggleFavorite(testNote) } coAnswers {
+            noteMirror.value = testNote.copy(isFavorite = true)
             Result.success(Unit)
         }
 
-        viewModel.favoriteNote(testNote)
+        viewModel.toggleFavorite(testNote)
 
         // The ViewModel patches nothing itself: the repository upserts the flipped row and the
         // screen re-reads it.
         val state = viewModel.content.value as NotePreviewContent.Success
-        assertTrue(state.note.favorite) // false → true
+        assertTrue(state.note.isFavorite) // false → true
     }
 
     @Test
-    fun `favoriteNote failure leaves the note as it was`() = runTest {
+    fun `toggleFavorite failure leaves the note as it was`() = runTest {
         val viewModel = createViewModel()
-        coEvery { noteRepository.favoriteNote(any()) } returns Result.failure(RuntimeException())
+        coEvery { noteRepository.toggleFavorite(any()) } returns Result.failure(RuntimeException())
         every { errorHandler.getErrorMessage(any()) } returns "fav failed"
 
         viewModel.actionError.test {
-            viewModel.favoriteNote(testNote)
+            viewModel.toggleFavorite(testNote)
             assertEquals("fav failed", awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
-        assertFalse((viewModel.content.value as NotePreviewContent.Success).note.favorite)
+        assertFalse((viewModel.content.value as NotePreviewContent.Success).note.isFavorite)
     }
 
     // -------------------------------------------------------------------------

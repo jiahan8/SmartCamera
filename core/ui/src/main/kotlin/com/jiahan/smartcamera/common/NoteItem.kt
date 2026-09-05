@@ -58,8 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.jiahan.smartcamera.core.ui.R
-import com.jiahan.smartcamera.domain.HomeNote
-import com.jiahan.smartcamera.ui.theme.SmartCameraTheme
+import com.jiahan.smartcamera.domain.Note
+import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import com.jiahan.smartcamera.util.AppConstants.ANIMATION_DURATION_SHORT_MS
 import com.jiahan.smartcamera.util.toFormattedDateTime
 import kotlinx.coroutines.launch
@@ -68,7 +68,7 @@ import kotlinx.coroutines.launch
 private data class NoteItemCallbacks(
     val onNavigateToNotePreview: () -> Unit,
     val onEditNote: () -> Unit,
-    val onFavoriteNote: () -> Unit,
+    val onToggleFavorite: () -> Unit,
     val onDeleteNote: () -> Unit,
     val onPhotoClick: (String) -> Unit,
     val onVideoClick: (String) -> Unit,
@@ -86,10 +86,10 @@ private data class NoteItemCallbacks(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteItem(
-    note: HomeNote,
+    note: Note,
     onNavigateToNotePreview: () -> Unit,
     onEditNote: () -> Unit,
-    onFavoriteNote: () -> Unit,
+    onToggleFavorite: () -> Unit,
     onDeleteNote: () -> Unit,
     onPhotoClick: (String) -> Unit,
     onVideoClick: (String) -> Unit,
@@ -101,7 +101,7 @@ fun NoteItem(
     val callbacks = remember(
         onNavigateToNotePreview,
         onEditNote,
-        onFavoriteNote,
+        onToggleFavorite,
         onDeleteNote,
         onPhotoClick,
         onVideoClick,
@@ -112,7 +112,7 @@ fun NoteItem(
         NoteItemCallbacks(
             onNavigateToNotePreview = onNavigateToNotePreview,
             onEditNote = onEditNote,
-            onFavoriteNote = onFavoriteNote,
+            onToggleFavorite = onToggleFavorite,
             onDeleteNote = onDeleteNote,
             onPhotoClick = onPhotoClick,
             onVideoClick = onVideoClick,
@@ -153,7 +153,7 @@ fun NoteItem(
                 onClick = callbacks.onNavigateToNotePreview,
                 onDoubleClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    callbacks.onFavoriteNote()
+                    callbacks.onToggleFavorite()
                 },
                 onLongClick = { openActionsSheet() }
             )
@@ -203,7 +203,7 @@ fun NoteItem(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         AnimatedVisibility(
-                            visible = note.favorite,
+                            visible = note.isFavorite,
                             enter = scaleIn(
                                 animationSpec = spring(
                                     dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -224,7 +224,7 @@ fun NoteItem(
                                         indication = null
                                     ) {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        callbacks.onFavoriteNote()
+                                        callbacks.onToggleFavorite()
                                     },
                                 tint = primaryColor
                             )
@@ -295,14 +295,14 @@ fun NoteItem(
         ) {
             BottomSheetActionItem(
                 icon = Icons.Rounded.FavoriteBorder,
-                label = if (note.favorite)
+                label = if (note.isFavorite)
                     stringResource(R.string.remove_like)
                 else
                     stringResource(R.string.like),
                 onClick = {
                     closeSheetThen {
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        callbacks.onFavoriteNote()
+                        callbacks.onToggleFavorite()
                     }
                 }
             )
@@ -413,20 +413,20 @@ private const val SKELETON_ITEM_COUNT = 3
 @Preview(showBackground = true, name = "NoteItem – text only")
 @Composable
 private fun NoteItemPreview() {
-    SmartCameraTheme {
+    SmartPhotosTheme {
         NoteItem(
-            note = HomeNote(
+            note = Note(
                 noteId = "note1",
                 username = "john_doe",
                 text = "Hello, this is a preview note with some sample text that wraps across multiple lines.",
                 mediaList = null,
                 profilePictureUrl = null,
-                favorite = false,
+                isFavorite = false,
                 createdDate = null
             ),
             onNavigateToNotePreview = {},
             onEditNote = {},
-            onFavoriteNote = {},
+            onToggleFavorite = {},
             onDeleteNote = {},
             onPhotoClick = {},
             onVideoClick = {},
@@ -439,20 +439,20 @@ private fun NoteItemPreview() {
 @Preview(showBackground = true, name = "NoteItem – favorited")
 @Composable
 private fun NoteItemFavoritedPreview() {
-    SmartCameraTheme {
+    SmartPhotosTheme {
         NoteItem(
-            note = HomeNote(
+            note = Note(
                 noteId = "note2",
                 username = "jane_doe",
                 text = "This note is marked as a favourite.",
                 mediaList = null,
                 profilePictureUrl = null,
-                favorite = true,
+                isFavorite = true,
                 createdDate = null
             ),
             onNavigateToNotePreview = {},
             onEditNote = {},
-            onFavoriteNote = {},
+            onToggleFavorite = {},
             onDeleteNote = {},
             onPhotoClick = {},
             onVideoClick = {},

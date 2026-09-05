@@ -57,8 +57,8 @@ import com.jiahan.smartcamera.settings.SettingsScreen
  */
 fun NavGraphBuilder.smartPhotosNavGraph(
     navController: NavController,
-    scrollToTop: Long?,
-    onScrollDirectionChanged: (Boolean) -> Unit,
+    scrollToTopRequestedAt: Long?,
+    onScrollDirectionChanged: (isScrollingUp: Boolean) -> Unit,
     onScrollToTopConsumed: () -> Unit,
     onUpdateStartDestination: (Any) -> Unit,
     snackbarHostState: SnackbarHostState,
@@ -83,7 +83,7 @@ fun NavGraphBuilder.smartPhotosNavGraph(
                 navController.navigate(ExploreRoute)
             },
             onScrollDirectionChanged = onScrollDirectionChanged,
-            scrollToTop = scrollToTop,
+            scrollToTopRequestedAt = scrollToTopRequestedAt,
             onScrollToTopConsumed = onScrollToTopConsumed,
             snackbarHostState = snackbarHostState,
         )
@@ -108,7 +108,7 @@ fun NavGraphBuilder.smartPhotosNavGraph(
                 navController.navigate(VideoPreviewRoute(MediaSourceType.REMOTE, url))
             },
             onScrollDirectionChanged = onScrollDirectionChanged,
-            scrollToTop = scrollToTop,
+            scrollToTopRequestedAt = scrollToTopRequestedAt,
             onScrollToTopConsumed = onScrollToTopConsumed,
             snackbarHostState = snackbarHostState,
         )
@@ -116,7 +116,7 @@ fun NavGraphBuilder.smartPhotosNavGraph(
 
     composable<NoteRoute> {
         NoteScreen(
-            onBack = { navController.popBackStack() },
+            onBack = navController::popBackStack,
             onNavigateToPhotoPreview = { uri ->
                 navController.navigate(PhotoPreviewRoute(MediaSourceType.LOCAL, uri))
             },
@@ -129,7 +129,7 @@ fun NavGraphBuilder.smartPhotosNavGraph(
 
     composable<EditNoteRoute> {
         EditNoteScreen(
-            onBack = { navController.popBackStack() },
+            onBack = navController::popBackStack,
             onNavigateToPhotoPreview = { url ->
                 navController.navigate(PhotoPreviewRoute(MediaSourceType.REMOTE, url))
             },
@@ -155,7 +155,7 @@ fun NavGraphBuilder.smartPhotosNavGraph(
                 navController.navigate(VideoPreviewRoute(MediaSourceType.REMOTE, url))
             },
             onScrollDirectionChanged = onScrollDirectionChanged,
-            scrollToTop = scrollToTop,
+            scrollToTopRequestedAt = scrollToTopRequestedAt,
             onScrollToTopConsumed = onScrollToTopConsumed,
             snackbarHostState = snackbarHostState,
         )
@@ -163,7 +163,7 @@ fun NavGraphBuilder.smartPhotosNavGraph(
 
     composable<ExploreRoute> {
         ExploreScreen(
-            onBack = { navController.popBackStack() },
+            onBack = navController::popBackStack,
             onNavigateToPhotoPreview = { url ->
                 navController.navigate(PhotoPreviewRoute(MediaSourceType.REMOTE, url))
             },
@@ -172,21 +172,21 @@ fun NavGraphBuilder.smartPhotosNavGraph(
 
     composable<PhotoPreviewRoute> {
         PhotoPreviewScreen(
-            onBack = { navController.popBackStack() },
+            onBack = navController::popBackStack,
             snackbarHostState = snackbarHostState
         )
     }
 
     composable<VideoPreviewRoute> {
         VideoPreviewScreen(
-            onBack = { navController.popBackStack() },
+            onBack = navController::popBackStack,
             snackbarHostState = snackbarHostState
         )
     }
 
     composable<NotePreviewRoute> {
         NotePreviewScreen(
-            onBack = { navController.popBackStack() },
+            onBack = navController::popBackStack,
             onNavigateToPhotoPreview = { url ->
                 navController.navigate(PhotoPreviewRoute(MediaSourceType.REMOTE, url))
             },
@@ -229,7 +229,7 @@ fun NavGraphBuilder.smartPhotosNavGraph(
 
     composable<SettingsRoute> {
         SettingsScreen(
-            onBack = { navController.popBackStack() },
+            onBack = navController::popBackStack,
             onNavigateToAuth = {
                 navController.navigate(AuthRoute) {
                     popUpTo(0) { inclusive = true }
