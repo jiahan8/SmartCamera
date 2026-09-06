@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -52,6 +53,17 @@ import com.jiahan.smartcamera.preview.NotePreviewRoute
 import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
 import com.jiahan.smartcamera.util.AppConstants.ANIMATION_DURATION_SHORT_MS
 
+/**
+ * The NavHost, the bottom bar and the Scaffold around them.
+ *
+ * @param navController hoisted so a test can supply a `TestNavHostController` and read the back
+ *   stack. It was remembered internally, which left `SmartPhotosNavigationTest` asserting
+ *   navigation through the bottom bar's *selected* state -- the only observable the composable
+ *   exposed. That works for the five top-level destinations and degrades to
+ *   `assertDoesNotExist()` everywhere else, which passes for a blank screen and a NavHost that
+ *   never composed just as happily as for the intended destination. Defaulted, so production
+ *   callers are unchanged and the default is evaluated in this composable's own composition.
+ */
 @Composable
 fun SmartPhotosApp(
     isDarkTheme: Boolean,
@@ -68,6 +80,7 @@ fun SmartPhotosApp(
     onUpdateStartDestination: (Any) -> Unit,
     onPendingNoteIdConsumed: () -> Unit,
     onCompleteUpdate: () -> Unit,
+    navController: NavHostController = rememberNavController(),
 ) {
     SmartPhotosTheme(darkTheme = isDarkTheme) {
         val view = LocalView.current
@@ -82,8 +95,6 @@ fun SmartPhotosApp(
                 }
             }
         }
-
-        val navController = rememberNavController()
 
         LaunchedEffect(isAppReady, pendingNoteId) {
             if (isAppReady && pendingNoteId != null) {

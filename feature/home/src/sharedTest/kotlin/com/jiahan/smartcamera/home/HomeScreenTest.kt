@@ -1,12 +1,8 @@
 package com.jiahan.smartcamera.home
 
-import androidx.activity.ComponentActivity
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -21,9 +17,10 @@ import com.jiahan.smartcamera.fake.FakeResourceProvider
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
+import com.jiahan.smartcamera.uitest.BaseScreenTest
+import com.jiahan.smartcamera.uitest.UI_TEST_TIMEOUT_MS
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -37,10 +34,7 @@ import org.junit.runner.RunWith
  * Lives in `sharedTest`: runs on the JVM (Robolectric) and on-device via the same source.
  */
 @RunWith(AndroidJUnit4::class)
-class HomeScreenTest {
-
-    @get:Rule
-    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+class HomeScreenTest : BaseScreenTest() {
 
     private val noteRepository = FakeNoteRepository()
     private var navigatedToNotePreview: String? = null
@@ -84,14 +78,6 @@ class HomeScreenTest {
         }
     }
 
-    private fun string(resId: Int) = composeTestRule.activity.getString(resId)
-
-    private fun waitForText(text: String) {
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
-        }
-    }
-
     @Test
     fun emptyFeed_showsNoNotesFoundMessage() {
         noteRepository.setNotes(emptyList())
@@ -121,17 +107,6 @@ class HomeScreenTest {
     }
 
     @Test
-    fun overflowMenu_exposesDeleteAction() {
-        noteRepository.setNotes(listOf(note("doc1", "Deletable note")))
-        launchHomeScreen()
-        waitForText("Deletable note")
-
-        composeTestRule.onNodeWithContentDescription(string(UiR.string.cd_more_options))
-            .performClick()
-        waitForText(string(UiR.string.delete))
-    }
-
-    @Test
     fun overflowMenu_deleteConfirmed_removesNoteFromList() {
         noteRepository.setNotes(listOf(note("doc1", "Deletable note")))
         launchHomeScreen()
@@ -145,9 +120,7 @@ class HomeScreenTest {
         waitForText(string(UiR.string.delete_note))
         composeTestRule.onNodeWithText(string(UiR.string.delete)).performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText("Deletable note").fetchSemanticsNodes().isEmpty()
-        }
+        waitForNoText("Deletable note")
         composeTestRule.onNodeWithText(string(R.string.create_first_note)).assertIsDisplayed()
     }
 
@@ -162,10 +135,7 @@ class HomeScreenTest {
         waitForText(string(UiR.string.like))
         composeTestRule.onNodeWithText(string(UiR.string.like)).performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithContentDescription(string(UiR.string.cd_marked_as_favorite))
-                .fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForContentDescription(string(UiR.string.cd_marked_as_favorite))
         composeTestRule.onNodeWithContentDescription(string(UiR.string.cd_marked_as_favorite))
             .assertIsDisplayed()
     }
@@ -178,7 +148,7 @@ class HomeScreenTest {
 
         composeTestRule.onNodeWithText("Tap me").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) { navigatedToNotePreview == "doc-nav" }
+        composeTestRule.waitUntil(timeoutMillis = UI_TEST_TIMEOUT_MS) { navigatedToNotePreview == "doc-nav" }
         assertEquals("doc-nav", navigatedToNotePreview)
     }
 }

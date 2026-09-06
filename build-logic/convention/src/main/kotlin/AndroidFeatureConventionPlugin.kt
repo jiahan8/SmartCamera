@@ -65,6 +65,29 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
 
         verifyNoLateralDependencies()
 
+        /*
+         * The `sharedTest/` arrangement, for every feature rather than for the seven that had
+         * copied it.
+         *
+         * A Compose behaviour suite placed there compiles into both the unit-test and androidTest
+         * source sets, so it runs under Robolectric in CI *and* on-device, written once. That is
+         * what makes it the default: CI runs `compileDebugAndroidTestKotlin` and no emulator, so a
+         * suite left in androidTest alone is a suite nothing executes -- which is exactly how four
+         * assertions came to sit wrong for months, asserting one screen's copy against another's.
+         *
+         * It went from one module to seven in a single change, which is past the threshold this
+         * build uses. A feature with no `sharedTest/` directory pays a source set that resolves to
+         * nothing and three unused test artifacts; that is cheaper than seven copies, and cheaper
+         * than the eighth feature discovering by hand that its screen test never ran.
+         */
+        extensions.configure(com.android.build.api.dsl.LibraryExtension::class.java) {
+            sourceSets.getByName("test").java.srcDir("src/sharedTest/kotlin")
+            sourceSets.getByName("androidTest").java.srcDir("src/sharedTest/kotlin")
+            // Robolectric renders a real screen on the JVM and resolves this module's strings with
+            // it. Also set by `smartphotos.android.screenshot`; setting it twice is idempotent.
+            testOptions.unitTests.isIncludeAndroidResources = true
+        }
+
         dependencies {
             add("api", project(":core:domain"))
             add("implementation", project(":core:ui"))
@@ -108,8 +131,8 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
              * this artifact merges into the debug variant -- without it every Compose test fails
              * with "Unable to resolve activity for Intent ... ComponentActivity". Eight of the nine
              * feature modules declared this line, each with its own copy of that explanation;
-             * :feature:explore is the only one with no Compose test to need it, and a debug-only
-             * manifest contribution is a cheap thing for it to carry.
+             * :feature:explore was the ninth, carrying a debug-only manifest contribution it had no
+             * Compose test to need. `ExploreScreenTest` ended that -- all nine need this now.
              *
              * debugImplementation, not testImplementation, and that is the part worth keeping: the
              * manifest merge is per-variant, so this cannot arrive through :core:testing's
@@ -132,8 +155,9 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
 
             /*
              * The on-device half of a feature's screen test. Eight of the nine modules declared
-             * these five lines verbatim -- :feature:explore is the exception, having no androidTest
-             * source set at all, and it pays only an unused test classpath for them.
+             * these five lines verbatim; :feature:explore was the exception, with no androidTest
+             * source set at all. It stopped being one when `ExploreScreenTest` landed in its
+             * `sharedTest/`, which compiles into androidTest -- so all nine now use these.
              *
              * :core:testing arrives here as well as on `testImplementation` above because a
              * `sharedTest/` suite compiles into both source sets and builds its ViewModel from the
@@ -142,6 +166,10 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
              * enough, and :app keeps its HiltTestRunner for the suites that do use a component.
              */
             add("androidTestImplementation", project(":core:testing"))
+            // The screen-test vocabulary -- waitForText and friends, the resource lookup, the
+            // timeout constant. On both test source sets for the same reason :core:testing is:
+            // a `sharedTest/` suite compiles into each and names these helpers from both.
+            add("androidTestImplementation", project(":core:ui-testing"))
             add("androidTestImplementation", libs.findLibrary("androidx-junit").get())
             add("androidTestImplementation", libs.findLibrary("androidx-test-runner").get())
             add(
@@ -149,6 +177,36 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
                 platform(libs.findLibrary("androidx-compose-bom").get()),
             )
             add("androidTestImplementation", libs.findLibrary("androidx-ui-test-junit4").get())
+            /*
+             * Espresso, which no feature's test sources name and every one of them needs anyway:
+             * a Compose rule syncs through `Espresso.onIdle()` on device, so the version that ends
+             * up on this classpath decides whether the suite runs at all.
+             *
+             * Without this line it is not the catalog's 3.7.0. `androidx.test.ext:junit` carries a
+             * transitive espresso-core 3.5.0 and nothing raised it, so all nine features resolved
+             * that -- while :app, the one module declaring espresso for itself, resolved 3.7.0.
+             * 3.5.0 reaches for `InputManager.getInstance` via reflection, which API 36 removed, so
+             * every Compose test on a modern device died in `onIdle` with `NoSuchMethodException`
+             * before reaching its first assertion: 51 failures across seven modules, and :app green
+             * beside them. CI compiles androidTest and never runs it, so nothing reported this.
+             *
+             * Declared, not merely constrained, so the version travels with the catalog pin.
+             */
+            add("androidTestImplementation", libs.findLibrary("androidx-espresso-core").get())
+
+            /*
+             * The JVM half of the same `sharedTest/` suite. Robolectric is what makes
+             * `AndroidJUnit4` resolve to a sandbox rather than the on-device runner, and
+             * ui-test-junit4 is what lets a Compose rule exist in the unit-test source set at all.
+             * `androidx-junit` carries the runner annotation those suites name.
+             *
+             * No Compose BOM line: it is already on `implementation` above, which the unit-test
+             * compile classpath extends.
+             */
+            add("testImplementation", libs.findLibrary("robolectric").get())
+            add("testImplementation", libs.findLibrary("androidx-junit").get())
+            add("testImplementation", libs.findLibrary("androidx-ui-test-junit4").get())
+            add("testImplementation", project(":core:ui-testing"))
         }
     }
 }

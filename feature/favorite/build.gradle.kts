@@ -29,6 +29,7 @@ plugins {
 
 android {
     namespace = "com.jiahan.smartcamera.feature.favorite"
+
 }
 
 dependencies {

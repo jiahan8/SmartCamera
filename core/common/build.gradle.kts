@@ -79,4 +79,9 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
+    // MediaUriExt is the one thing here that touches a real Android type: its whole job is
+    // `Uri.toString()` one way and `String.toUri()` the other, so a stubbed `android.net.Uri`
+    // would leave the test asserting nothing. Robolectric gives it the real parser.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.junit)
 }

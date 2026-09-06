@@ -27,6 +27,7 @@ plugins {
 
 android {
     namespace = "com.jiahan.smartcamera.feature.preview"
+
 }
 
 dependencies {
@@ -55,7 +56,6 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
 
-    // NotePreviewViewModelTest is Robolectric-backed: toRoute() builds a real Bundle.
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.junit)
+    // NotePreviewViewModelTest and NotePreviewScreenTest are Robolectric-backed; the artifacts
+    // for that arrive from `smartphotos.android.feature`.
 }

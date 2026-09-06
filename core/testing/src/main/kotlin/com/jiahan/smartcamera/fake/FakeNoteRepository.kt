@@ -8,15 +8,13 @@ import com.jiahan.smartcamera.domain.NoteCursor
 import com.jiahan.smartcamera.domain.NoteMediaDetail
 import com.jiahan.smartcamera.domain.NotePage
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 
 /**
  * In-memory [NoteRepository] test double.
  *
  * Paged/search/sync results are individually configurable so a test can drive any UI state without
- * Firebase or the network. Both streams are backed by a [MutableStateFlow] so emissions propagate
+ * Firebase or the network. Both streams are backed by a [NoteMirror] so emissions propagate
  * reactively, and mutating operations record their invocations for behavior assertions.
  *
  * The two streams model the two Room queries and are kept separately rather than derived from one
@@ -37,8 +35,9 @@ class FakeNoteRepository : NoteRepository {
     var syncResult: Result<Unit> = Result.success(Unit)
     var buildLocalMediaDetailsResult: Result<List<NoteMediaDetail>> = Result.success(emptyList())
 
-    private val notesFlow = MutableStateFlow<List<Note>>(emptyList())
-    private val favoritesFlow = MutableStateFlow<List<Note>>(emptyList())
+    /** The `notes` table. Shared with the mockk-based tests so the semantics are defined once. */
+    val notes = NoteMirror()
+    private val favorites = NoteMirror()
 
     var notesCallCount = 0
     var lastNotesCursor: NoteCursor? = null
@@ -52,12 +51,12 @@ class FakeNoteRepository : NoteRepository {
     var lastAddedNote: Note? = null
 
     fun setFavorites(notes: List<Note>) {
-        favoritesFlow.value = notes
+        favorites.set(notes)
     }
 
     /** Seeds the mirror [getNotesStream] observes, the way a fetched page would. */
     fun setNotesStream(notes: List<Note>) {
-        notesFlow.value = notes
+        this.notes.set(notes)
     }
 
     /** Stubs a successful page. [nextCursor] drives pagination independently of [notes].size. */
@@ -70,21 +69,9 @@ class FakeNoteRepository : NoteRepository {
         notesCallCount++
         // Mirrors `cacheNotes`: the real repository writes every page it fetches into Room on its
         // way through, which is what makes getNotesStream the feed's read path rather than the
-        // returned page. Upsert by id and keep insertion order, standing in for the table's
-        // `ORDER BY created_date DESC` -- a page already arrives newest-first, and a reload adds
-        // to the mirror rather than replacing it, exactly as the un-reconciled table does.
-        notesResult.getOrNull()?.let { mirror(it.notes) }
+        // returned page.
+        notesResult.getOrNull()?.let { notes.upsert(it.notes) }
         return notesResult
-    }
-
-    /** Upserts by note id, keeping insertion order -- the table's `ORDER BY created_date DESC`. */
-    private fun mirror(notes: List<Note>) {
-        notesFlow.update { existing ->
-            val refreshed = existing.map { old ->
-                notes.firstOrNull { it.noteId == old.noteId } ?: old
-            }
-            refreshed + notes.filter { new -> existing.none { it.noteId == new.noteId } }
-        }
     }
 
     private fun matchesQuery(note: Note, query: String): Boolean =
@@ -103,8 +90,8 @@ class FakeNoteRepository : NoteRepository {
         lastUpdatedNote = note
         // Unconditional, matching the real repository once its favorite gate was dropped.
         if (updateResult.isSuccess) {
-            notesFlow.update { notes ->
-                notes.map { if (it.noteId == note.noteId) note else it }
+            notes.update { rows ->
+                rows.map { if (it.noteId == note.noteId) note else it }
             }
         }
         return updateResult
@@ -113,7 +100,7 @@ class FakeNoteRepository : NoteRepository {
     override suspend fun searchNotes(query: String): Result<List<Note>> {
         // Mirrors the real repository writing its results through, so searchNotesStream can cover
         // notes the feed never paged.
-        searchResult.getOrNull()?.let { mirror(it) }
+        searchResult.getOrNull()?.let { notes.upsert(it) }
         return searchResult
     }
 
@@ -124,8 +111,8 @@ class FakeNoteRepository : NoteRepository {
         // Room query reactively dropping it, so tests exercising that pipeline (e.g. delete-then-
         // assert-removed-from-list) see the same behavior as production.
         if (deleteResult.isSuccess) {
-            notesFlow.update { notes -> notes.filterNot { it.noteId == noteId } }
-            favoritesFlow.update { notes -> notes.filterNot { it.noteId == noteId } }
+            notes.delete(noteId)
+            favorites.delete(noteId)
         }
         return deleteResult
     }
@@ -141,28 +128,15 @@ class FakeNoteRepository : NoteRepository {
             val toggled = note.copy(isFavorite = !note.isFavorite)
             // The note keeps its row either way, flag flipped -- the real repository upserts in
             // both directions now rather than deleting on unfavorite.
-            notesFlow.update { notes ->
-                if (notes.none { it.noteId == toggled.noteId }) notes + toggled
-                else notes.map { if (it.noteId == toggled.noteId) toggled else it }
-            }
-            favoritesFlow.update { notes ->
-                when {
-                    toggled.isFavorite && notes.none { it.noteId == toggled.noteId } ->
-                        notes + toggled
-
-                    !toggled.isFavorite ->
-                        notes.filterNot { it.noteId == toggled.noteId }
-
-                    else -> notes.map { if (it.noteId == toggled.noteId) toggled else it }
-                }
-            }
+            notes.upsert(toggled)
+            if (toggled.isFavorite) favorites.upsert(toggled) else favorites.delete(toggled.noteId)
         }
         return favoriteResult
     }
 
     override suspend fun getNote(noteId: String): Result<Note> {
         val result = getNoteResult ?: Result.failure(NoSuchElementException("No note for $noteId"))
-        result.getOrNull()?.let { mirror(listOf(it)) }
+        result.getOrNull()?.let { notes.upsert(it) }
         return result
     }
 
@@ -179,21 +153,19 @@ class FakeNoteRepository : NoteRepository {
         uriList: List<MediaUri>
     ): Result<List<NoteMediaDetail>> = buildLocalMediaDetailsResult
 
-    override fun getNotesStream(limit: Int): Flow<List<Note>> =
-        notesFlow.map { notes -> notes.take(limit) }
+    override fun getNotesStream(limit: Int): Flow<List<Note>> = notes.stream(limit)
 
-    override fun getNoteStream(noteId: String): Flow<Note?> =
-        notesFlow.map { notes -> notes.firstOrNull { it.noteId == noteId } }
+    override fun getNoteStream(noteId: String): Flow<Note?> = notes.noteStream(noteId)
 
     override fun searchNotesStream(query: String): Flow<List<Note>> =
-        notesFlow.map { notes -> notes.filter { matchesQuery(it, query) } }
+        notes.stream().map { rows -> rows.filter { matchesQuery(it, query) } }
 
     override fun getFavoriteNotesStream(query: String): Flow<List<Note>> =
-        favoritesFlow.map { notes ->
+        favorites.stream().map { rows ->
             if (query.isBlank()) {
-                notes
+                rows
             } else {
-                notes.filter {
+                rows.filter {
                     it.text?.contains(query, ignoreCase = true) == true ||
                             it.username.contains(query, ignoreCase = true)
                 }

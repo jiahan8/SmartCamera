@@ -91,9 +91,10 @@ jobs:
       # That is not hypothetical either -- it is exactly how :core:data's DataStore and Room
       # bindings broke while assembleDebug stayed green.
       #
-      # Compiling is the whole point: connectedDebugAndroidTest would need an emulator, and the
-      # failure this catches happens at compile time. `./scripts/run-test-lab.sh` still runs the
-      # suites themselves on real devices.
+      # Kept even though the `instrumented` job below now runs these suites for real. It is a
+      # thirty-second step that fails before an emulator has finished booting, and it covers every
+      # module in one task -- so a Hilt graph break is red here while the emulator job is still
+      # downloading a system image.
       - name: Compile instrumented tests
         if: ${{ !cancelled() }}
         run: ./gradlew compileDebugAndroidTestKotlin
@@ -173,6 +174,95 @@ jobs:
             */*/build/outputs/roborazzi/
             */build/reports/lint-results-debug.html
             */*/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+
+  # The 103 instrumented tests, on an emulator Gradle brings up itself.
+  #
+  # Its own job rather than a step in `android`, because it is the slow one -- system image,
+  # emulator boot, eleven install/run cycles -- and there is no reason a unit-test failure should
+  # wait behind it or vice versa.
+  #
+  # **Why this exists.** CI used to stop at `compileDebugAndroidTestKotlin`, so nothing ever ran
+  # these. Most are `sharedTest/` suites that Robolectric also runs under `testDebugUnitTest`, so
+  # their assertions were at least executed somewhere -- but fourteen are androidTest-only and had
+  # no JVM half at all: HiltGraphSmokeTest, SmartPhotosNavigationTest, SettingsScreenNavigationTest
+  # and ProfileScreenTest. Those four are the graph-level coverage, and they ran only when somebody
+  # remembered to attach a device. Four `sharedTest` assertions had already sat wrong for months
+  # for exactly this reason.
+  instrumented:
+    name: Instrumented tests
+    runs-on: ubuntu-latest
+    # 60: the emulator has to download a system image on a cache miss, boot, then install and run
+    # eleven test APKs. The whole thing is ~15 minutes warm.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # GitHub's ubuntu runners ship /dev/kvm but leave it root-owned, and an emulator without
+      # hardware acceleration is slow enough to hit the job timeout rather than to fail cleanly.
+      # This is the udev rule Google's own emulator-on-CI guidance uses.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # ~1.5GB, and it never changes unless the device definition does -- hence the key. A miss
+      # costs the download, not the run.
+      - name: Cache the managed device's system image
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/system-images
+            ~/.android/avd
+          key: gmd-${{ hashFiles('build-logic/convention/src/main/kotlin/com/jiahan/smartcamera/buildlogic/ManagedDevices.kt') }}
+          restore-keys: gmd-
+
+      # Same secret and same reason as the `android` job: the Google Services plugin fails the
+      # build without it, and it is gitignored.
+      - name: Restore google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON secret is not set. Generate it with 'base64 -i app/google-services.json'."
+            exit 1
+          fi
+          echo "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json
+
+      # The task name is the managed device's name -- see ManagedDevices.kt in build-logic, which
+      # is also where the API level and image source are chosen and explained.
+      #
+      # --no-parallel, which matters here and nowhere else in this file: gradle.properties turns
+      # org.gradle.parallel on, and eleven modules installing and running against one emulator at
+      # once exhausts the 4GB daemon heap and dies mid-run inside a UTP worker. The same rule
+      # applies to running connectedDebugAndroidTest by hand.
+      - name: Run instrumented tests
+        run: ./gradlew pixel6Api36DebugAndroidTest --no-parallel
+
+      # Globs for the reason the android job's artifact paths give: two depths because modules are
+      # core/* and feature/*, plus :app at one. The managed-device reports land under a directory
+      # named for the device.
+      - name: Upload instrumented test report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-report
+          path: |
+            */build/reports/androidTests/managedDevice/
+            */build/outputs/androidTest-results/managedDevice/
+            */*/build/reports/androidTests/managedDevice/
+            */*/build/outputs/androidTest-results/managedDevice/
           if-no-files-found: ignore
 
   functions:

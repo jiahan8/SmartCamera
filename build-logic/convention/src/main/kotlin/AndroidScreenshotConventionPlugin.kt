@@ -40,7 +40,7 @@ import org.gradle.kotlin.dsl.dependencies
  *   modules want it for behaviour suites that take no pictures at all. It lives in
  *   [AndroidFeatureConventionPlugin] for the features, and in `:core:ui`'s own build file, which is
  *   the only screenshot module that is not a feature.
- * - Any dependency on `:core:testing`. That is the *fixtures* module -- the nine fakes and
+ * - Any dependency on `:core:testing`. That is the *fixtures* module -- the fakes and
  *   MainDispatcherRule -- which the feature convention already adds and `:core:ui` declares for its
  *   non-screenshot tests. It is also, being a module every feature takes, the one place a cycle
  *   could be introduced by accident.

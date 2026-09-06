@@ -35,7 +35,7 @@ class DatabaseConvertersTest {
     @Test
     fun `toMediaList empty JSON array returns empty list`() {
         val result = converters.toMediaList("[]")
-        assertTrue(requireNotNull(result).isEmpty())
+        assertEquals(emptyList<MediaDetail>(), result)
     }
 
     // -------------------------------------------------------------------------
@@ -270,10 +270,15 @@ class DatabaseConvertersTest {
         assertNull(photo.thumbnailUrl)
         assertEquals(false, photo.isVideo)
         assertEquals(listOf("a cat", "a dog"), photo.generatedTexts)
-        assertEquals("cat", requireNotNull(photo.generatedObjects)[0].objectName)
-        assertEquals(0.95, requireNotNull(photo.generatedObjects)[0].score, 0.001)
-        assertEquals("outdoor", requireNotNull(photo.generatedLabels)[0].label)
-        assertEquals(0.99, requireNotNull(photo.generatedLabels)[0].score, 0.001)
+
+        val objects = requireNotNull(photo.generatedObjects)
+        assertEquals("cat", objects[0].objectName)
+        assertEquals(0.95, objects[0].score, 0.001)
+
+        val labels = requireNotNull(photo.generatedLabels)
+        assertEquals("outdoor", labels[0].label)
+        assertEquals(0.99, labels[0].score, 0.001)
+
         assertEquals("Eiffel Tower", requireNotNull(photo.generatedLandmarks)[0].label)
         assertEquals("Nike", requireNotNull(photo.generatedLogos)[0].label)
 

@@ -5,6 +5,7 @@ import com.jiahan.smartcamera.MainDispatcherRule
 import com.jiahan.smartcamera.data.repository.AnalyticsRepository
 import com.jiahan.smartcamera.data.repository.NoteRepository
 import com.jiahan.smartcamera.domain.Note
+import com.jiahan.smartcamera.fake.NoteMirror
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.util.AppConstants.DEBOUNCE_MS
@@ -18,16 +19,13 @@ import io.mockk.runs
 import io.mockk.unmockkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,6 +34,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchViewModelTest {
@@ -54,7 +53,7 @@ class SearchViewModelTest {
      * `searchNotes` returns -- which is what lets a mutation made on another screen show up here
      * with no `NoteHandler` event in between.
      */
-    private val notesMirror = MutableStateFlow<List<Note>>(emptyList())
+    private val notesMirror = NoteMirror()
 
     @Before
     fun setUp() {
@@ -64,7 +63,7 @@ class SearchViewModelTest {
         every { errorHandler.getErrorMessage(any()) } returns "Error"
         every { noteRepository.searchNotesStream(any()) } answers {
             val query = firstArg<String>()
-            notesMirror.map { notes -> notes.filter { matchesQuery(it, query) } }
+            notesMirror.stream().map { notes -> notes.filter { matchesQuery(it, query) } }
         }
         stubSearch(emptyList())
     }
@@ -82,15 +81,6 @@ class SearchViewModelTest {
     private fun makeNote(id: String, isFavorite: Boolean = false, text: String = "text $id") =
         Note(noteId = id, username = "user", isFavorite = isFavorite, text = text)
 
-    private fun mirror(notes: List<Note>) {
-        notesMirror.update { existing ->
-            val refreshed = existing.map { old ->
-                notes.firstOrNull { it.noteId == old.noteId } ?: old
-            }
-            refreshed + notes.filter { new -> existing.none { it.noteId == new.noteId } }
-        }
-    }
-
     /**
      * Stubs the remote search and mirrors what it returns, the way the real `searchNotes` writes
      * its results through. A stub that only returns is a stub that renders nothing.
@@ -98,12 +88,12 @@ class SearchViewModelTest {
     private fun stubSearch(notes: List<Note>, query: String? = null) {
         if (query == null) {
             coEvery { noteRepository.searchNotes(any()) } coAnswers {
-                mirror(notes)
+                notesMirror.upsert(notes)
                 Result.success(notes)
             }
         } else {
             coEvery { noteRepository.searchNotes(query) } coAnswers {
-                mirror(notes)
+                notesMirror.upsert(notes)
                 Result.success(notes)
             }
         }
@@ -206,7 +196,7 @@ class SearchViewModelTest {
     @Test
     fun `search failure still shows matches already in the mirror`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            mirror(listOf(makeNote("a", text = "cat food")))
+            notesMirror.upsert(listOf(makeNote("a", text = "cat food")))
             coEvery { noteRepository.searchNotes(any()) } returns
                     Result.failure(RuntimeException("offline"))
             val viewModel = searchViewModel()
@@ -226,7 +216,7 @@ class SearchViewModelTest {
     @Test
     fun `search failure over a populated mirror reports through actionError`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            mirror(listOf(makeNote("a", text = "cat food")))
+            notesMirror.upsert(listOf(makeNote("a", text = "cat food")))
             val exception = RuntimeException("offline")
             coEvery { noteRepository.searchNotes(any()) } returns Result.failure(exception)
             every { errorHandler.getErrorMessage(exception) } returns "offline"

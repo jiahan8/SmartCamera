@@ -1,7 +1,7 @@
 # SmartPhotos
 
 Android app (Kotlin) for organizing photos/notes with ML-based tagging. Firebase backend + a
-Node.js Cloud Functions project in `functions/`. Sixteen Gradle modules, plus `build-logic/` — an
+Node.js Cloud Functions project in `functions/`. Seventeen Gradle modules, plus `build-logic/` — an
 included build holding the six convention plugins.
 
 **This file is loaded into every agent conversation, so it states rules, not reasoning. When a rule
@@ -16,8 +16,9 @@ that story is in [ARCHITECTURE.md](ARCHITECTURE.md).**
 | `:core:data` | Android library holding every implementation of a `:core:domain`/`:core:common` contract: the `Default*`/`Firebase*` repositories, Room, DataStore, `FirebaseModule`, `DataModule`. |
 | `:core:ui` | Android library, shared Compose vocabulary: `common/` (14 composables), `ui/theme/`, `util/DateTimeUtils.kt`/`FlowUtils.kt`. |
 | `:feature:*` | One Android library per screen — `home`, `search`, `note`, `preview`, `favorite`, `profile`, `settings`, `auth`, `explore` — holding its Compose screen(s), ViewModel(s), route and tests. |
-| `:core:testing` | Shared test fixtures: nine `fake/` repository doubles + `MainDispatcherRule`. `testImplementation` only (plus `androidTestImplementation` wherever a `sharedTest/` runs in both). |
+| `:core:testing` | Shared test fixtures: ten `fake/` repository doubles + `MainDispatcherRule`. `testImplementation` only (plus `androidTestImplementation` wherever a `sharedTest/` runs in both). |
 | `:core:screenshot-testing` | `BaseScreenshotTest` + the four artifacts it names (Robolectric, Roborazzi ×2, compose `ui-test-junit4`). No build file declares it — `smartphotos.android.screenshot` pulls it in. |
+| `:core:ui-testing` | `BaseScreenTest`: the activity-backed Compose rule, `string(resId)` and the four `waitFor*` helpers the eleven screen suites share. `testImplementation` + `androidTestImplementation`, both added by `smartphotos.android.feature`. |
 
 Sources sit at `<module>/src/main/kotlin/com/jiahan/smartcamera/` (`:app` uses `java/`).
 
@@ -66,12 +67,13 @@ Run from the repo root (Gradle wrapper):
 | Task | Command |
 | --- | --- |
 | Debug APK | `./gradlew assembleDebug` |
-| Unit tests (427 across 14 modules) | `./gradlew testDebugUnitTest :core:domain:test` |
+| Unit tests (648 across 14 modules) | `./gradlew testDebugUnitTest :core:domain:test` |
 | Hilt graph + androidTest sources | `./gradlew compileDebugAndroidTestKotlin` |
 | Release variant | `./gradlew assembleRelease` |
 | Screenshot diff / re-record | `./gradlew verifyRoborazziDebug` / `recordRoborazziDebug` |
 | Lint | `./gradlew lintDebug` |
-| Instrumented (needs a device) | `./gradlew connectedDebugAndroidTest` |
+| Instrumented, attached device | `./gradlew connectedDebugAndroidTest --no-parallel` |
+| Instrumented, no device (boots its own) | `./gradlew pixel6Api36DebugAndroidTest --no-parallel` |
 | Cloud Functions lint (Node 24) | `npm --prefix functions run lint` |
 
 - **Run `compileDebugAndroidTestKotlin` and `assembleRelease` after changing any module's dependency
@@ -104,11 +106,31 @@ hence both tasks above. `:core:testing` and `:core:screenshot-testing` have no t
   Main. Defaults to `UnconfinedTestDispatcher`; pass `StandardTestDispatcher` when a test needs
   virtual-time control (e.g. a debounce).
 
+### Database migrations
+
+**`AppDatabaseMigrationTest` (`:core:data`, `sharedTest`) is the only test that migrates anything.**
+Every other suite builds the database with `inMemoryDatabaseBuilder`, which creates the current
+schema outright — so an upgrade path is exercised nowhere else, and `DatabaseModule` builds the real
+database with neither `addMigrations` nor a destructive fallback. A migration Room cannot apply
+throws on open, on the launch after the update, for every installed user, with the whole suite green.
+
+- **Add a case to it in the same commit as a schema bump.** `runMigrationsAndValidate` compares the
+  result against the exported `<version>.json` and fails on any mismatch; passing
+  `validateDroppedTables = true` also asserts a removed table is really gone. What it cannot check
+  is *data*, so assert the rows too — a migration that recreated a table empty passes validation and
+  loses every cached note.
+- **`MigrationTestHelper` reads `schemas/` through the instrumentation context's assets**, which is
+  why `core/data/build.gradle.kts` adds `schemas` as an asset srcDir for both test source sets and
+  sets `unitTests.isIncludeAndroidResources`. Without those it fails with "Cannot find the schema
+  file in the assets folder", not with anything about migrations.
+
 ### Screenshot tests
 
 Roborazzi goldens live beside the composable they capture, in four modules: `:core:ui`,
 `:feature:home`, `:feature:search`, `:feature:settings`. Each keeps its own under
-`src/test/screenshots/`.
+`src/test/screenshots/`. Fifty of them, all in light/dark pairs. The bulk are `:core:ui`'s:
+the shared `common/` vocabulary is what every feature draws *with*, so a regression there is
+app-wide and no feature-level test would localise it.
 
 - **A capturing module applies `smartphotos.android.screenshot` and nothing else** — the plugin
   brings the Roborazzi tasks, the VCS-tracked `outputDir`, `unitTests.isIncludeAndroidResources`
@@ -124,33 +146,145 @@ Roborazzi goldens live beside the composable they capture, in four modules: `:co
   clock, locale or random value in the fixture first.
 - **A golden that renders a build-varying value is a hoisting problem, not a re-recording chore** —
   `SettingsScreen` takes `versionName` as a parameter and the test pins `"1.0.0"`.
+- **Wrap the capture in `Surface(color = MaterialTheme.colorScheme.background)`, inside the theme.**
+  `SmartPhotosApp` wraps the whole nav host in one and no feature screen paints its own background,
+  so without it a capture lands on the host's default light ground rather than the theme's. That
+  flatters a light golden — which is why nine of them were recorded that way and nobody noticed —
+  and makes a dark one plainly wrong: dark app bar, light body.
+- **Capture every case in both themes.** Dark is the half where a hardcoded colour or a token read
+  from the wrong scheme actually shows, and the light capture cannot see it. Every golden here is
+  half of a pair.
+- **Pass a composable's callbacks by name in a capture, never as positional `{}`s.** They are all
+  no-ops, so reordering the parameters rebinds them silently — no compile error, and no golden diff
+  either, because the pixels are identical.
+- **A text field inside a dialog cannot be captured, and the reason is upstream, not yours.** Under
+  Robolectric the pair never reports itself idle unless the field's width is fixed, so `capture`
+  spins ~600,000 recompositions and dies on `AppNotIdleException` after 60s. Neither half does it
+  alone. Pausing the test clock doesn't help — it's a recomposition loop, not an animation — and
+  every Roborazzi entry point syncs first, `captureScreenRoboImage` included. `SettingsScreen`'s
+  ChangePassword dialog is the one case; `SettingsScreenScreenshotTest` records the bisect. **Cover
+  the fields on their own** (`:core:ui`'s `PasswordField` goldens) rather than reconstructing the
+  dialog in the test — a golden of a rebuilt layout can't regress with the screen.
 
 ### Instrumented tests
 
-Ten modules — `app/`, `core/data/`, and every `:feature:*` except `:feature:explore`. `:app` uses a
-custom `HiltTestRunner`, the AndroidX Test Orchestrator and `clearPackageData=true` for hermetic
-runs; **don't remove these without understanding why.** Library modules declare no
-`testInstrumentationRunner` — their suites build a ViewModel from `:core:testing`'s fakes. The same
-suites run on Firebase Test Lab via `./scripts/run-test-lab.sh` (needs `gcloud`, auth, Blaze).
+Eleven modules — `app/`, `core/data/`, and every `:feature:*`. 103 tests, and **CI runs all of
+them** — see [CI](#ci). Against an attached emulator it is `./gradlew connectedDebugAndroidTest`,
+**module by module and `--no-parallel`** — all eleven at once exhausts the 4GB daemon heap and dies
+mid-run in a UTP worker. `:app` uses a custom `HiltTestRunner`, the AndroidX Test Orchestrator and
+`clearPackageData=true` for hermetic runs; **don't remove these without understanding why.** Library
+modules declare no `testInstrumentationRunner` — their suites build a ViewModel from
+`:core:testing`'s fakes. The same suites run on Firebase Test Lab via `./scripts/run-test-lab.sh`
+(needs `gcloud`, auth, Blaze), which is now for real hardware rather than for running them at all.
 
-**`sharedTest/` is the arrangement to copy for a new screen test.** A Compose behaviour suite placed
-there compiles into *both* the unit-test and androidTest source sets, so it runs under Robolectric
-and on-device, written once — `:feature:home`'s `HomeScreenTest` and `:feature:auth`'s
-`AuthScreenTest` do this (two `sourceSets` lines plus `unitTests.isIncludeAndroidResources = true`).
-**Check an existing androidTest-only suite's own note before promoting it**: `ProfileScreenTest` is
-device-only because its bottom-anchored save button and inline validation text depend on real
-viewport/scroll behaviour.
+**With no device attached, use the Gradle managed device instead:** `./gradlew
+pixel6Api36DebugAndroidTest --no-parallel`, which boots its own emulator, downloading the image on
+first run. `configureManagedDevices` (`build-logic`) declares it on every Android module and records
+why it is API 36 and `google-atd` — **read that before changing either.** The device's *name* is the
+task name, so renaming it changes the CI workflow's command.
+
+**Espresso's version is load-bearing and nothing names it.** A Compose rule syncs through
+`Espresso.onIdle()` on device, so the version on the androidTest classpath decides whether a suite
+runs at all — and `androidx.test.ext:junit` carries a transitive espresso-core 3.5.0 that reaches
+for `InputManager.getInstance`, removed in API 36. Every feature resolved that while `:app`, the one
+module declaring espresso for itself, resolved the catalog's 3.7.0; the result was 51 failures
+across seven modules, all dying in `onIdle` before their first assertion, with `:app` green beside
+them. `smartphotos.android.feature` now declares it. **When a device run fails identically in every
+suite, suspect the classpath before the assertions.**
+
+**`sharedTest/` is where a screen test goes, and androidTest-only is the exception that has to
+argue for itself.** A Compose behaviour suite placed there compiles into *both* the unit-test and
+androidTest source sets, so it runs under Robolectric in CI and on-device, written once. **A
+feature needs no build-file change to use it** — `smartphotos.android.feature` already adds both
+`sourceSets` lines, `unitTests.isIncludeAndroidResources` and the test artifacts to all nine, so a
+new suite is one file in `src/sharedTest/kotlin`. Eleven suites do this; `:feature:auth` is the one
+to copy. **It is not only for Compose** —
+`:core:data`'s `NoteDaoTest` and `DefaultUserPreferencesRepositoryTest` live there too, because
+Robolectric supplies a real SQLite and a real filesystem, which is all they ever needed a device
+for.
+
+**`:app`'s nav graph is tested by `SmartPhotosNavigationTest`, and it is the one suite that needs
+Hilt.** The nine feature suites hand their screen a ViewModel built from fakes; there the subject
+*is* the graph, so every screen inside defaults to `hiltViewModel()` and the whole data layer has to
+resolve. It uses `@UninstallModules(DataModule::class)` plus `@BindValue` fakes for all nine
+bindings — **per class, not `@TestInstallIn`**, because `HiltGraphSmokeTest` in the same source set
+exists precisely to resolve the *real* bindings and a global replacement would gut it. Two pieces of
+scaffolding come with it: `HiltTestActivity` in `src/debug` (an `@AndroidEntryPoint` host, since
+`hiltViewModel()` resolves through the activity and `ui-test-manifest`'s plain `ComponentActivity`
+is not one), and a local `FakeAppUpdateRepository` — that interface lives in `:core:data`, which
+**neither fixtures module may depend on**, so its fake cannot go in `:core:testing`.
+
+**Match a bottom-bar tab with `hasText(label) and isSelectable()`, never text alone.** Profile and
+Home each render their word twice on their own screen, as the title and as the tab, so a bare match
+finds two nodes and throws.
+
+**Assert navigation against the back stack, not against the bottom bar.** `SmartPhotosApp` takes
+`navController: NavHostController = rememberNavController()` so `SmartPhotosNavigationTest` can hand
+it a `TestNavHostController` and read `currentDestination`/`toRoute()` — the officially documented
+shape, and the reason the parameter exists. It used to remember one internally, which left the tab's
+*selected* state as the only observable: derived from `currentDestination.hasRoute(...)`, so honest
+as far as it went, but defined for only five of the twelve destinations. Everywhere else the
+assertion collapsed to `assertDoesNotExist()` on a tab, which passes for a blank screen and a
+NavHost that never composed just as readily as for arriving somewhere. **Still assert the tab where
+the bar is the subject** — it is UI a user reads — but the route is what pins the test.
+
+**A `TestNavHostController` needs `ComposeNavigator` *and* `DialogNavigator` added to it.** `NavHost`
+looks up both and `return`s early if either is missing, so a controller carrying one renders nothing
+at all — no exception, no log line, every assertion failing as though navigation were broken. The
+graph declares only `composable<…>` destinations; the dialog navigator is required regardless.
+
+**A screen suite extends `BaseScreenTest` (`:core:ui-testing`) rather than declaring its own rule.**
+It owns the `createAndroidComposeRule<ComponentActivity>()` all eleven had a copy of, plus
+`string(resId)`, `waitForText`/`waitForNoText` and the contentDescription pair — the same
+harness-owns-the-rule shape as `BaseScreenshotTest`. **Wait, don't assert, straight after an
+interaction**: `assertDoesNotExist` right after the tap that removes something passes for the wrong
+reason if the node has not gone yet, which is what `waitForNoText` is for.
+
+**A `sharedTest` file may not name anything Robolectric-only.** `@Config` is the one that bites:
+every `src/test` suite in `:core:data` carries `@Config(application = Application::class)`, and
+moving one up to `sharedTest` fails the androidTest compile with `Unresolved reference 'Config'`.
+Drop it — a library module declares no custom `Application`, so Robolectric instantiates a plain one
+anyway. `@RunWith(AndroidJUnit4::class)` is the annotation that works on both sides, resolving to
+Robolectric on the JVM and to the real runner on-device.
+
+**CI compiled androidTest and never ran it** (`compileDebugAndroidTestKotlin`, no emulator), and
+four assertions sat wrong for months because of it — `SearchScreenTest` asserting the empty-results
+copy against the Idle state, and all three of `FavoriteScreenTest`'s empty-state cases asserting
+`no_results_found` where a blank query renders `favorite_note_to_see_it_here`. None could ever have
+passed. The `instrumented` job closed that; `compileDebugAndroidTestKotlin` stays because it is the
+fast half and fails before an emulator finishes booting. **`sharedTest/` is still where a screen
+suite goes** — it is the source set that runs in both places, and the Robolectric half reports in
+seconds.
+
+**Four things stay androidTest-only.** `HiltGraphSmokeTest` and `SmartPhotosNavigationTest` both
+need a real Hilt component and `:app`'s `HiltTestRunner`. The other two are device-only because
+production code sleeps on `Dispatchers.Main`:
+`SettingsScreenNavigationTest` (the ViewModel waits `AUTH_ACTION_DELAY_MS` before emitting
+`NavigateToAuth`) and `ProfileScreenTest` (bottom-anchored save button and inline validation text
+need real viewport/scroll behaviour). A real `delay` on Main becomes a message on a paused
+Robolectric looper that no amount of `waitUntil` makes due — and
+`composeTestRule.mainClock.advanceTimeBy` drives the Compose frame clock, not the looper's, so it
+does not help. **That is the bar for staying in androidTest: state the reason in the class doc, as
+both of those do.**
 
 ### CI
 
-`.github/workflows/ci.yml` runs on every push to `main`, every PR, and on demand: debug APK, release
-APK (`-x uploadCrashlyticsMappingFileRelease`), androidTest compile, then unit tests, screenshot
-comparison and `lintDebug` as separate steps on JDK 21 — each runs even if an earlier one failed, so
-one run reports every problem. A parallel job lints `functions/`.
+`.github/workflows/ci.yml` runs on every push to `main`, every PR, and on demand, as **three
+parallel jobs**: `android` (debug APK, release APK with `-x uploadCrashlyticsMappingFileRelease`,
+androidTest compile, then unit tests, screenshot comparison and `lintDebug` as separate steps on JDK
+21 — each runs even if an earlier one failed, so one run reports every problem), `instrumented`, and
+one that lints `functions/`.
 
+- **`instrumented` runs the 103 device tests on a Gradle managed device** —
+  `pixel6Api36DebugAndroidTest --no-parallel`, on an emulator the job boots itself. Its own job
+  because it is the slow one, and there is no reason a unit-test failure should wait behind an
+  emulator boot. Two things it needs that no other job does: a udev rule handing `/dev/kvm` to the
+  runner (without acceleration it hits the timeout instead of failing), and a cache of the system
+  image keyed on `ManagedDevices.kt`.
 - It needs one repository secret, `GOOGLE_SERVICES_JSON` (`app/google-services.json` is gitignored
   and the Google Services plugin fails without it): `base64 -i app/google-services.json`, pasted
-  into Settings > Secrets and variables > Actions as a *repository* secret.
+  into Settings > Secrets and variables > Actions as a *repository* secret. **Both Android jobs
+  restore it** — a new job that builds anything needs that step too.
 - On a screenshot failure download the `screenshot-and-lint-reports` artifact — its `*_compare.png`
   files show reference/diff/actual side by side.
 - **The artifact path lists are globs** (`*/build/…` and `*/*/build/…`) so a new module is collected
@@ -164,7 +298,7 @@ same settings:
 
 | Plugin | Applied by | Applies | Sets |
 | --- | --- | --- | --- |
-| `smartphotos.android.application` | `:app` | AGP application, Kotlin Android | compileSdk 37, minSdk 28, Java 11, JVM target 11, test-JVM pin |
+| `smartphotos.android.application` | `:app` | AGP application, Kotlin Android | compileSdk 37, minSdk 28, Java 11, JVM target 11, test-JVM pin, the `pixel6Api36` managed device + `animationsDisabled` |
 | `smartphotos.android.library` | `:core:common`, `:core:data`, `:core:ui`, `:core:testing`, `:core:screenshot-testing` | AGP library, Kotlin Android | the same |
 | `smartphotos.android.compose` | `:app`, `:core:ui`, `:core:screenshot-testing` | Compose compiler | `buildFeatures.compose = true` |
 | `smartphotos.android.feature` | all nine `:feature:*` | the library + compose conventions, KSP, Hilt, kotlin-serialization | the `:core:domain`/`:core:ui` edges, the Compose set, icons, lifecycle, `ui-test-manifest`, the test baseline (`:core:testing`, junit, mockk, coroutines-test, Turbine) and the androidTest baseline; **enforces the feature layering** |
@@ -468,6 +602,19 @@ lists, no manual URL escaping.**
 - **An enum used as a route argument needs `@Keep`** (see `MediaSourceType` in
   `preview/PreviewRoutes.kt`). Navigation resolves enum arguments through `Class.forName()`, so R8
   renaming one breaks navigation in release builds only — invisible to debug runs and unit tests.
+- **A deep link is declared twice and nothing but a test connects the halves.**
+  `SearchRoute.SEARCH_DEEP_LINK_URI_PATTERN` is one URI handed to `navDeepLink`;
+  `AndroidManifest.xml` spells the same URI as `scheme`/`host`/`pathPrefix` on an intent filter.
+  Change either side and the other still compiles and lints — **so change both, and keep both tests
+  passing**: `SearchDeepLinkManifestTest` (`:app`, JVM) resolves the URI against the merged manifest,
+  `SmartPhotosNavigationTest.searchDeepLink_navigatesToSearch` feeds the real `ACTION_VIEW` intent to
+  `handleDeepLink`. Neither half is optional — a narrowed manifest means the system never routes the
+  URI to the app at all, while a changed graph pattern lands the user on the start destination,
+  which reads as "slightly broken" rather than as a failure.
+- **`MainActivity` never reads `intent.data`, and should not start.** `NavController` calls
+  `handleDeepLink(activity.intent)` itself when the graph is created, which is the whole mechanism.
+  The manifest's second filter (`live://…/image`) is matched by no destination — **it is dead, not a
+  pattern to copy.**
 
 ## Conventions
 

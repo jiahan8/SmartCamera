@@ -27,14 +27,6 @@ plugins {
 
 android {
     namespace = "com.jiahan.smartcamera.feature.home"
-
-    sourceSets {
-        // The arrangement :feature:auth's note says to copy for the next feature, copied. One
-        // Compose behaviour suite compiled into both source sets: on the JVM under Robolectric for
-        // CI, and on-device under the instrumentation runner.
-        getByName("test").java.srcDir("src/sharedTest/kotlin")
-        getByName("androidTest").java.srcDir("src/sharedTest/kotlin")
-    }
 }
 
 dependencies {

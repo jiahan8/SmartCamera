@@ -37,22 +37,6 @@ plugins {
 android {
     namespace = "com.jiahan.smartcamera.feature.auth"
 
-    sourceSets {
-        // AuthScreenTest came over from :app's sharedTest, and so did the arrangement: one Compose
-        // behaviour suite compiled into both source sets, running on the JVM under Robolectric for
-        // CI and on-device under the instrumentation runner. :feature:settings' screen test is
-        // androidTest-only, which is the weaker arrangement -- copy this one for the next feature.
-        getByName("test").java.srcDir("src/sharedTest/kotlin")
-        getByName("androidTest").java.srcDir("src/sharedTest/kotlin")
-    }
-
-    testOptions {
-        // Robolectric renders AuthScreen on the JVM and needs this module's own strings with it --
-        // and :core:common's, which merge in through the dependency.
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
 }
 
 dependencies {
@@ -89,12 +73,4 @@ dependencies {
      * build-logic. Move it into the feature plugin when a second feature adds a `@Preview`.
      */
     implementation(libs.androidx.ui.tooling.preview)
-
-    // The JVM half of sharedTest. Robolectric is what makes AndroidJUnit4 resolve to a sandbox
-    // rather than the on-device runner; no Roborazzi here, because this module captures no
-    // screenshots.
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.junit)
-    testImplementation(platform(libs.androidx.compose.bom))
-    testImplementation(libs.androidx.ui.test.junit4)
 }

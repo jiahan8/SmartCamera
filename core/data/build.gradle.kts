@@ -48,8 +48,29 @@ android {
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
+    sourceSets {
+        // The :feature:auth arrangement, applied to the suites that need a real SQLite and a real
+        // file: compiled into both source sets, run on the JVM under Robolectric for CI and
+        // on-device under the instrumentation runner.
+        getByName("test").java.srcDir("src/sharedTest/kotlin")
+        getByName("androidTest").java.srcDir("src/sharedTest/kotlin")
+
+        // MigrationTestHelper reads the exported schema JSON at runtime, so `schemas/` has to ship
+        // as a test asset. Both source sets, because the migration suite is in `sharedTest`.
+        getByName("test").assets.srcDir("$projectDir/schemas")
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
     testOptions {
         execution = "ANDROIDX_TEST_ORCHESTRATOR"
+
+        // MigrationTestHelper resolves the exported schema JSON through the instrumentation
+        // context's assets. On the JVM half of `sharedTest` that context is Robolectric's, and it
+        // sees no assets at all unless they are merged in -- the migration suite fails with
+        // "Cannot find the schema file in the assets folder" without this.
+        unitTests {
+            isIncludeAndroidResources = true
+        }
     }
 }
 
@@ -159,4 +180,18 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestUtil(libs.androidx.test.orchestrator)
+
+    // NoteDaoTest asserts that a write reaches a subscriber that was already collecting. Proving
+    // that needs one collection held across the write, which is what Turbine is for -- two
+    // `.first()` calls are two collections and would pass against a Flow that is not reactive at
+    // all. On both classpaths because the suite is in `sharedTest` and compiles into both.
+    testImplementation(libs.turbine)
+    androidTestImplementation(libs.turbine)
+
+    // MigrationTestHelper, for the v1 -> v2 auto-migration. Nothing else opens an *existing*
+    // database file: every other suite here builds one fresh with `inMemoryDatabaseBuilder`, which
+    // never migrates, so an upgrade crash would reach users with the whole suite green.
+    testImplementation(libs.room.testing)
+    androidTestImplementation(libs.room.testing)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }

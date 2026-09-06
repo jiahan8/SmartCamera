@@ -1,9 +1,6 @@
 package com.jiahan.smartcamera.auth
 
-import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -17,9 +14,10 @@ import com.jiahan.smartcamera.fake.FakeUserPreferencesRepository
 import com.jiahan.smartcamera.fake.FakeUserRepository
 import com.jiahan.smartcamera.feature.auth.R
 import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
+import com.jiahan.smartcamera.uitest.BaseScreenTest
+import com.jiahan.smartcamera.uitest.UI_TEST_TIMEOUT_MS
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -35,14 +33,12 @@ import org.junit.runner.RunWith
  * instrumentation runner. The [AndroidJUnit4] runner resolves to Robolectric on the JVM and to the
  * real Android runner on-device. That source set came with the test when auth became a module:
  * :app is not the only place it can live, and leaving it behind would have put a test above the
- * code it exercises. `SettingsScreenTest` is androidTest-only by comparison, which is the weaker
- * of the two arrangements.
+ * code it exercises. This file used to name `SettingsScreenTest` as the weaker, androidTest-only
+ * arrangement; that stopped being true when it moved to `sharedTest`, and every screen suite bar
+ * `ProfileScreenTest` now follows this one.
  */
 @RunWith(AndroidJUnit4::class)
-class AuthScreenTest {
-
-    @get:Rule
-    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+class AuthScreenTest : BaseScreenTest() {
 
     private val authRepository = FakeAuthRepository()
     private var navigatedToHome = false
@@ -71,8 +67,6 @@ class AuthScreenTest {
         }
         return viewModel
     }
-
-    private fun string(resId: Int) = composeTestRule.activity.getString(resId)
 
     @Test
     fun loginMode_showsEmailPasswordAndLoginButton_andHidesSignUpOnlyFields() {
@@ -138,10 +132,7 @@ class AuthScreenTest {
 
         tapSignUp()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(string(R.string.verification_email_sent))
-                .fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForText(string(R.string.verification_email_sent))
         composeTestRule.onNodeWithText(string(R.string.resend_verification_email))
             .performScrollTo().assertIsDisplayed()
         assertEquals(1, authRepository.signUpCallCount)
@@ -168,10 +159,7 @@ class AuthScreenTest {
 
         tapSignUp()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(string(CommonR.string.username_not_available))
-                .fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForText(string(CommonR.string.username_not_available))
         assertEquals(0, authRepository.signUpCallCount)
     }
 
@@ -185,9 +173,7 @@ class AuthScreenTest {
 
         tapSignUp()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(errorMessage).fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForText(errorMessage)
         composeTestRule.onNodeWithText(errorMessage).assertIsDisplayed()
         assertEquals(1, authRepository.signUpCallCount)
     }
@@ -223,7 +209,7 @@ class AuthScreenTest {
         composeTestRule.onNodeWithText(string(R.string.password)).performTextInput("password123")
         composeTestRule.onNodeWithText(string(R.string.login)).performScrollTo().performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) { navigatedToHome }
+        composeTestRule.waitUntil(timeoutMillis = UI_TEST_TIMEOUT_MS) { navigatedToHome }
 
         assertEquals(1, authRepository.signInCallCount)
         assertEquals("user@test.com", authRepository.lastSignInEmail)
@@ -240,9 +226,7 @@ class AuthScreenTest {
         composeTestRule.onNodeWithText(string(R.string.password)).performTextInput("wrong-password")
         composeTestRule.onNodeWithText(string(R.string.login)).performScrollTo().performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(errorMessage).fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForText(errorMessage)
 
         composeTestRule.onNodeWithText(errorMessage).assertIsDisplayed()
         assertEquals(1, authRepository.signInCallCount)
@@ -259,10 +243,7 @@ class AuthScreenTest {
         composeTestRule.onNodeWithText(string(R.string.password)).performTextInput("password123")
         composeTestRule.onNodeWithText(string(R.string.login)).performScrollTo().performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(string(R.string.email_not_verified))
-                .fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForText(string(R.string.email_not_verified))
 
         composeTestRule.onNodeWithText(string(R.string.resend_verification_email))
             .performScrollTo().assertIsDisplayed()

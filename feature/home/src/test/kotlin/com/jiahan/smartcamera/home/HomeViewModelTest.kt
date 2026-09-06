@@ -7,6 +7,7 @@ import com.jiahan.smartcamera.domain.Note
 import com.jiahan.smartcamera.domain.NoteCursor
 import com.jiahan.smartcamera.domain.NotePage
 import com.jiahan.smartcamera.fake.FakeRemoteConfigRepository
+import com.jiahan.smartcamera.fake.NoteMirror
 import com.jiahan.smartcamera.note.NoteErrorReporter
 import com.jiahan.smartcamera.note.NoteShareDelegate
 import com.jiahan.smartcamera.util.ErrorHandler
@@ -21,9 +22,6 @@ import io.mockk.unmockkAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -61,15 +59,14 @@ class HomeViewModelTest {
      * so a test drives the UI by what lands here -- whether that is a mirrored page, a mutation
      * writing through, or another screen's write arriving underneath Home.
      */
-    private val notesMirror = MutableStateFlow<List<Note>>(emptyList())
+    private val notesMirror = NoteMirror()
 
     @Before
     fun setUp() {
         every { errorHandler.logError(any()) } just runs
         every { errorHandler.getErrorMessage(any()) } returns "An error occurred"
         every { noteRepository.getNotesStream(any()) } answers {
-            val limit = firstArg<Int>()
-            notesMirror.map { notes -> notes.take(limit) }
+            notesMirror.stream(firstArg<Int>())
         }
         stubAnyPage(emptyList())
     }
@@ -87,8 +84,9 @@ class HomeViewModelTest {
 
     /**
      * The trailing digits of [id] become an age: `note1` is newer than `note20`, and an id with no
-     * digits (`fresh`, `added`) is newest of all. That is what lets [mirror] sort the way the table
-     * does, which matters once the feed reads a windowed `LIMIT` rather than everything.
+     * digits (`fresh`, `added`) is newest of all. That is what lets [NoteMirror.stream] order the
+     * way the table does, which matters once the feed reads a windowed `LIMIT` rather than
+     * everything.
      */
     private fun makeNote(id: String, isFavorite: Boolean = false) = Note(
         noteId = id,
@@ -100,21 +98,6 @@ class HomeViewModelTest {
         )
     )
 
-    /**
-     * Upserts a page into [notesMirror] the way `cacheNotes` upserts it into Room: keyed by note
-     * id, appended in page order. Note that nothing is ever removed -- the table is not reconciled
-     * against the server, so a reload adds to the mirror rather than replacing it.
-     */
-    private fun mirror(page: List<Note>) {
-        notesMirror.update { existing ->
-            val refreshed = existing.map { old ->
-                page.firstOrNull { it.noteId == old.noteId } ?: old
-            }
-            (refreshed + page.filter { new -> existing.none { it.noteId == new.noteId } })
-                .sortedByDescending { it.createdDate }
-        }
-    }
-
     /** Stubs the page fetched at [cursor], mirroring it on the way out as the real fetch does. */
     private fun stubPage(
         cursor: NoteCursor?,
@@ -122,7 +105,7 @@ class HomeViewModelTest {
         nextCursor: NoteCursor? = null
     ) {
         coEvery { noteRepository.getNotes(cursor, any()) } coAnswers {
-            mirror(notes)
+            notesMirror.upsert(notes)
             Result.success(NotePage(notes, nextCursor))
         }
     }
@@ -130,7 +113,7 @@ class HomeViewModelTest {
     /** As [stubPage], for any cursor. */
     private fun stubAnyPage(notes: List<Note>, nextCursor: NoteCursor? = null) {
         coEvery { noteRepository.getNotes(any(), any()) } coAnswers {
-            mirror(notes)
+            notesMirror.upsert(notes)
             Result.success(NotePage(notes, nextCursor))
         }
     }
@@ -187,7 +170,7 @@ class HomeViewModelTest {
         // A cached feed is readable immediately on launch; the fetch only refreshes it.
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val cached = listOf(makeNote("cached"))
-        notesMirror.value = cached
+        notesMirror.set(cached)
         coEvery { noteRepository.getNotes(any(), any()) } coAnswers {
             delay(1.seconds)
             Result.success(NotePage(emptyList()))
@@ -207,7 +190,7 @@ class HomeViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         coEvery { noteRepository.getNotes(any(), any()) } coAnswers {
             delay(1.seconds)
-            mirror(listOf(makeNote("a")))
+            notesMirror.upsert(listOf(makeNote("a")))
             Result.success(NotePage(listOf(makeNote("a"))))
         }
 
@@ -235,7 +218,7 @@ class HomeViewModelTest {
     @Test
     fun `init keeps a populated mirror on screen when the fetch fails`() = runTest {
         val cached = listOf(makeNote("cached"))
-        notesMirror.value = cached
+        notesMirror.set(cached)
         val exception = RuntimeException("offline")
         coEvery { noteRepository.getNotes(any(), any()) } returns Result.failure(exception)
         every { errorHandler.getErrorMessage(exception) } returns "offline"
@@ -450,7 +433,7 @@ class HomeViewModelTest {
         stubPage(null, page0, TestCursor)
         coEvery { noteRepository.getNotes(TestCursor, any()) } coAnswers {
             delay(1.seconds)
-            mirror((11..20).map { makeNote("note$it") })
+            notesMirror.upsert((11..20).map { makeNote("note$it") })
             Result.success(NotePage((11..20).map { makeNote("note$it") }, OtherCursor))
         }
         val viewModel = homeViewModel()

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only manifest additions.
+
+    HiltTestActivity is registered here rather than in src/androidTest because the instrumentation
+    launches it against the app under test, which resolves activities through *this* merged
+    manifest. It is not exported and has no intent filter, so nothing but a test can start it, and
+    the release manifest never sees it.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name=".HiltTestActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SmartCamera" />
+    </application>
+
+</manifest>

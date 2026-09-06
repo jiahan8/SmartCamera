@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.functions.FirebaseFunctions
 import com.jiahan.smartcamera.database.dao.NoteDao
+import com.jiahan.smartcamera.domain.AppError
 import com.jiahan.smartcamera.util.ErrorHandler
 import com.jiahan.smartcamera.util.safeCall
 import kotlinx.coroutines.tasks.await
@@ -42,6 +43,10 @@ class DefaultAuthRepository @Inject constructor(
         displayName: String,
         username: String
     ): Result<Unit> = safeCall {
+        // The `?.` calls below are not the same shape as the guarded operations above: they run
+        // immediately after `createUserWithEmailAndPassword` succeeded, so `currentUser` is the
+        // account this call just made, and the rollback's `?.delete()` must not mask the profile
+        // failure it is reacting to.
         auth.createUserWithEmailAndPassword(email, password).await()
         auth.currentUser?.updateProfile(
             userProfileChangeRequest { this.displayName = displayName }
@@ -71,8 +76,8 @@ class DefaultAuthRepository @Inject constructor(
         currentPassword: String,
         newPassword: String
     ): Result<Unit> = safeCall {
-        val user = requireNotNull(auth.currentUser) { "" }
-        val email = requireNotNull(user.email) { "" }
+        val user = auth.currentUser ?: throw AppError.NotAuthenticated()
+        val email = user.email ?: throw AppError.NotAuthenticated()
         val credential = EmailAuthProvider.getCredential(email, currentPassword)
         user.reauthenticate(credential).await()
         user.updatePassword(newPassword).await()
@@ -84,11 +89,22 @@ class DefaultAuthRepository @Inject constructor(
     }
 
     override suspend fun sendEmailVerification(): Result<Unit> = safeCall {
-        auth.currentUser?.sendEmailVerification()?.await()
+        val user = auth.currentUser ?: throw AppError.NotAuthenticated()
+        user.sendEmailVerification().await()
     }
 
+    /**
+     * Deletes the account, then the local mirror.
+     *
+     * The guard is the whole point of the ordering. `auth.currentUser?.delete()` used to no-op when
+     * nobody was signed in and still fall through to `clearAllNotes()`, so an expired token turned
+     * "delete my account" into a success the caller navigated on: the Firebase account and its
+     * profile document survived, and every cached note was thrown away. Failing here leaves both
+     * intact.
+     */
     override suspend fun deleteAccount(): Result<Unit> = safeCall {
-        auth.currentUser?.delete()?.await()
+        val user = auth.currentUser ?: throw AppError.NotAuthenticated()
+        user.delete().await()
         noteDao.clearAllNotes()
     }
 

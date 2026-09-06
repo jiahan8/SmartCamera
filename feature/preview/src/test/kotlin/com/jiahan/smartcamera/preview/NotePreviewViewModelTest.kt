@@ -37,8 +37,8 @@ import org.robolectric.annotation.Config
 
 /**
  * [NotePreviewViewModel] parses its typed nav route via [androidx.navigation.toRoute], whose
- * internal [androidx.navigation.serialization.RouteDecoder] constructs a real [android.os.Bundle]
- * — that needs Robolectric's shadow to work outside a real Android runtime, hence Robolectric here.
+ * internal `RouteDecoder` constructs a real [android.os.Bundle] — that needs Robolectric's shadow
+ * to work outside a real Android runtime, hence Robolectric here.
  *
  * A plain [Application] stands in for `MyApp` (as in `BaseScreenshotTest`): the real one installs
  * the Firebase App Check provider in `onCreate()`, which throws under Robolectric because no

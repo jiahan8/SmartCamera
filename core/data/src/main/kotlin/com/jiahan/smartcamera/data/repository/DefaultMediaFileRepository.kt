@@ -68,9 +68,14 @@ class DefaultMediaFileRepository @Inject constructor(
                 val prefix = if (isVideo) PREFIX_VIDEO else PREFIX_PHOTO
                 val extension = if (isVideo) EXTENSION_MP4 else EXTENSION_JPG
                 val file = File.createTempFile("$prefix$timeStamp", extension, context.cacheDir)
-                URL(url).openStream().use { input ->
-                    FileOutputStream(file).use { output -> input.copyTo(output) }
-                }
+                // The destination exists before the source is opened, so a failed download leaves
+                // an empty file behind unless it is cleaned up here -- and this path fails on
+                // exactly the input a user retries: sharing a remote photo with no connectivity.
+                runCatching {
+                    URL(url).openStream().use { input ->
+                        FileOutputStream(file).use { output -> input.copyTo(output) }
+                    }
+                }.onFailure { file.delete() }.getOrThrow()
                 getUriForFile(context, FILE_PROVIDER_AUTHORITY, file)
             }.onFailure(errorHandler::logError).getOrNull()
         }

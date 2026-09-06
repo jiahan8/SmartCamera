@@ -23,6 +23,7 @@ plugins {
 
 android {
     namespace = "com.jiahan.smartcamera.feature.note"
+
 }
 
 dependencies {
@@ -49,7 +50,6 @@ dependencies {
     // AsyncImage, for the picked-media thumbnails.
     implementation(libs.coil.compose)
 
-    // EditNoteViewModelTest is Robolectric-backed: toRoute() builds a real Bundle.
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.junit)
+    // EditNoteViewModelTest and the two screen suites are Robolectric-backed; the artifacts for
+    // that arrive from `smartphotos.android.feature`.
 }

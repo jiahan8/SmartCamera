@@ -175,7 +175,7 @@ dependencies {
      * all three Roborazzi artifacts went with the suites that did.
      *
      * :core:testing stays, for one type: MainViewModelTest's `MainDispatcherRule`. It uses none of
-     * the nine fakes, which is the trap in reading this edge from the imports -- the rule is in
+     * the fakes, which is the trap in reading this edge from the imports -- the rule is in
      * package `com.jiahan.smartcamera`, the same package as the test, so it is used without an
      * import line to find it.
      *
@@ -200,6 +200,23 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.hilt.android.testing)
+
+    /*
+     * The Compose half of the androidTest classpath, for SmartPhotosNavigationTest -- the only
+     * suite in this module that renders anything. :app is not a feature, so none of this arrives
+     * from `smartphotos.android.feature`; it is declared here the way :core:ui declares its own.
+     *
+     * :core:testing supplies the repository fakes the nav test binds in place of the real data
+     * layer. It is already on `testImplementation` above for MainDispatcherRule; this is the
+     * on-device half of the same edge.
+     */
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestImplementation(project(":core:testing"))
+    // TestNavHostController. :app is the only module that renders the NavHost, so it is the only
+    // one that can hold a controller to assert against -- the nine feature suites are handed a
+    // screen, not a graph.
+    androidTestImplementation(libs.androidx.navigation.testing)
     kspAndroidTest(libs.hilt.android.compiler)
     androidTestUtil(libs.androidx.test.orchestrator)
     debugImplementation(libs.androidx.ui.tooling)

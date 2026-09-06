@@ -1,5 +1,6 @@
 import com.android.build.api.dsl.ApplicationExtension
 import com.jiahan.smartcamera.buildlogic.configureKotlinAndroid
+import com.jiahan.smartcamera.buildlogic.configureManagedDevices
 import com.jiahan.smartcamera.buildlogic.configureTestJvm
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -19,6 +20,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
 
         extensions.configure<ApplicationExtension> {
             configureKotlinAndroid(this)
+            configureManagedDevices(this)
         }
         configureTestJvm()
     }

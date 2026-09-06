@@ -1,13 +1,10 @@
 package com.jiahan.smartcamera.profile
 
-import androidx.activity.ComponentActivity
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
@@ -23,9 +20,10 @@ import com.jiahan.smartcamera.fake.FakeUserPreferencesRepository
 import com.jiahan.smartcamera.fake.FakeUserRepository
 import com.jiahan.smartcamera.feature.profile.R
 import com.jiahan.smartcamera.ui.theme.SmartPhotosTheme
+import com.jiahan.smartcamera.uitest.BaseScreenTest
+import com.jiahan.smartcamera.uitest.UI_TEST_TIMEOUT_MS
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.time.Instant
@@ -42,10 +40,7 @@ import kotlin.time.Instant
  * the real viewport/scroll behavior, which differs under Robolectric's fixed-size rendering.
  */
 @RunWith(AndroidJUnit4::class)
-class ProfileScreenTest {
-
-    @get:Rule
-    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+class ProfileScreenTest : BaseScreenTest() {
 
     private val userRepository = FakeUserRepository()
     private val authRepository = FakeAuthRepository()
@@ -84,14 +79,6 @@ class ProfileScreenTest {
             profilePictureUrl = null,
             createdDate = Instant.fromEpochMilliseconds(0L),
         )
-    }
-
-    private fun string(resId: Int) = composeTestRule.activity.getString(resId)
-
-    private fun waitForText(text: String) {
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
-        }
     }
 
     @Test
@@ -154,7 +141,7 @@ class ProfileScreenTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(string(R.string.save_changes)).performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+        composeTestRule.waitUntil(timeoutMillis = UI_TEST_TIMEOUT_MS) {
             userRepository.updateUserProfileCallCount == 1
         }
         assertEquals("Jane Doe", userRepository.lastUpdatedDisplayName)
